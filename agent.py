@@ -3,7 +3,7 @@ from typing import List, override
 
 from openai import OpenAI
 
-from chat_message import ChatMessage, MessageType
+from chat_message import ChatMessage, ChatMessages
 
 
 class Agent(ABC):
@@ -14,7 +14,7 @@ class Agent(ABC):
     """
 
     @abstractmethod
-    def respond(self, messages: List[ChatMessage]) -> ChatMessage:
+    def respond(self, messages: ChatMessages) -> ChatMessage:
         """
         Given the current state, and messages, respond.
 
@@ -43,24 +43,10 @@ class OpenAIAgent(Agent):
     def _gen_system_message(prompt: str) -> dict:
         return {"role": "developer", "content": prompt}
 
-    @staticmethod
-    def _convert_chat_message(message: ChatMessage) -> dict:
-        role = "assistant"
-        match message.type:
-            case MessageType.SPEECH:
-                role = "assistant"
-            case MessageType.NARRATION:
-                role = "user"
-            case MessageType.SYSTEM:
-                role = "developer"
-        return {"role": role, "content": message.content}
-
     @override
-    def respond(self, messages: List[ChatMessage]) -> ChatMessage:
+    def respond(self, messages: ChatMessages) -> ChatMessage:
         request_msgs: List[dict] = [self.system_message]
-        for message in messages:
-            msg = OpenAIAgent._convert_chat_message(message)
-            request_msgs.append(msg)
+        request_msgs.extend(messages.as_openai)
         response = self.openai.responses.create(model=self.model, input=request_msgs)
         output_text = response.output_text
         return ChatMessage.speech(self.name, output_text)
