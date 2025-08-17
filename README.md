@@ -14,3 +14,7 @@ repository](https://github.com/DougDougGithub/Multi-Agent-GPT-Characters).
 I have built this project using Python 3.13.5 and the
 [uv](https://docs.astral.sh/uv/) tool, although it should run with any Python
 virtual environment.
+
+You should install/sync dependencies with: `uv sync --all-groups`
+
+You can then run this project with: `uv run python main.py`
