@@ -88,12 +88,8 @@ class PiperVoiceActor(VoiceActor):
         ) as f:
             out_path = Path(f.name)
 
-        wav_bytes = self.voice.synthesize(message.content, speaker=self.speaker)
         with wave.open(out_path, "wb") as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(self.voice.config.samle_rate)
-            wf.writeframes(wav_bytes)
+            self.voice.synthesize_wav(message.content, wf, speaker=self.speaker)
         return out_path
 
 
