@@ -1,11 +1,13 @@
 import logging
 import os
 import tempfile
+import wave
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Iterable, List, Optional, Set, Union, override
 
 from openai import OpenAI
+from piper.voice import PiperVoice
 
 from chat_message import ChatMessage, MessageType
 
@@ -32,6 +34,59 @@ class VoiceActor(ABC):
         Return true if this voice actor should speak the message
         """
         raise NotImplementedError
+
+
+class PiperVoiceActor(VoiceActor):
+    """
+    Voice Actor that uses the piper-tts library for voices.
+
+    Piper models are relatively small, run locally and give okay output.
+    They can run with just the CPU or be GPU accelerated.
+
+    Piper models can contain multiple voices (known as speakers) or a single
+    voice.
+    """
+
+    def __init__(
+        self,
+        names: Union[str, Iterable[str]],
+        model_path: Path,
+        speaker: Optional[str] = None,
+    ):
+        self.names: Set[str] = []
+        if isinstance(names, (list, tuple, set)):
+            self.names: Set[str] = {names.casefold()}
+        else:
+            self.names: Set[str] = {n.casefold() for n in names}
+        self.voice: PiperVoice = PiperVoice.load(str(model_path))
+        self.speaker: str = speaker
+        if not speaker:
+            self.speaker = self.voice.speakers[0]
+
+    @override
+    def should_speak_message(self, message: ChatMessage) -> bool:
+        return (message.author.casefold() in self.names) and (
+            message.type == MessageType.SPEECH
+        )
+
+    @override
+    def speak_message(self, message: ChatMessage, folder_path: Path) -> Path:
+        log.debug(f"Speaking message {message.msg_id} with Piper")
+        folder_path.mkdir(parents=True, exist_ok=True)
+
+        out_path = None
+        with tempfile.NamedTemporaryFile(
+            dir=folder_path, suffix=self.file_suffix, delete=False
+        ) as f:
+            out_path = Path(f.name)
+
+        wav_bytes = self.voice.synthesize(message.content, speaker=self.speaker)
+        with wave.open(out_path, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(self.voice.config.samle_rate)
+            wf.writeframes(wav_bytes)
+        return out_path
 
 
 class EchoVoiceActor(VoiceActor):
