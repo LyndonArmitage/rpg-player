@@ -1,3 +1,13 @@
 Button {
     margin: 1 2;
 }
+
+#messages {
+    height: 1fr;     /* take all remaining vertical space */
+    padding: 1;
+}
+
+#buttons {
+    padding: 0 1;
+    height: auto;    /* only as tall as needed */
+}
