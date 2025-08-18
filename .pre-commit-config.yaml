@@ -32,3 +32,4 @@ repos:
   rev: 0.8.11
   hooks:
     - id: uv-lock
+    - id: uv-export
