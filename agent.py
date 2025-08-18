@@ -32,11 +32,21 @@ class OpenAIAgent(Agent):
     system prompt.
     """
 
-    def __init__(self, openai: OpenAI, model: str, name: str, system_prompt: str):
+    def __init__(
+        self,
+        openai: OpenAI,
+        name: str,
+        system_prompt: str,
+        model: str = "gpt-5",
+        temperature: float = 0.4,
+        max_tokens: int = 300,
+    ):
         self.openai: OpenAI = openai
-        self.model: str = model
         self.name: str = name
         self.system_prompt: str = system_prompt
+        self.model: str = model
+        self.temperature: float = temperature
+        self.max_tokens: int = max_tokens
         self.system_message: dict = OpenAIAgent._gen_system_message(system_prompt)
 
     @staticmethod
@@ -47,6 +57,13 @@ class OpenAIAgent(Agent):
     def respond(self, messages: ChatMessages) -> ChatMessage:
         request_msgs: List[dict] = [self.system_message]
         request_msgs.extend(messages.as_openai)
-        response = self.openai.responses.create(model=self.model, input=request_msgs)
+        response = self.openai.responses.create(
+            model=self.model,
+            input=request_msgs,
+            temperature=self.temperature,
+            tool_choice="none",
+            stream=False,
+            max_output_tokens=self.max_tokens,
+        )
         output_text = response.output_text
         return ChatMessage.speech(self.name, output_text)

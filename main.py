@@ -24,7 +24,7 @@ def main():
     openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
     log = logging.getLogger(__name__)
     if not openai_api_key:
-        log.warning("No OPENAI_API_KEY defined")
+        raise ValueError("No OPENAI_API_KEY defined")
     log.info("Hello from rpg-player!")
 
 
