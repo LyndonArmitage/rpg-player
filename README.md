@@ -86,7 +86,7 @@ temporary folder where the voice acting files should go, and which can be
 cleaned up upon exit.
 
 Generally, the voice acting files produced should be cleaned up elsewhere,
-after they have been player to avoid storing lots of unneeded files.
+after they have been played to avoid storing lots of unneeded files.
 
 You should try to stick with the `WAV` format for output. While it is slightly
 larger, it decodes faster, and is supported by more audio systems. Provided
@@ -115,4 +115,7 @@ For the `OpenAIAgent`, you need to provide it with a client, the model, a name
 and a system prompt to use.
 
 The system prompt is probably the most important input of them all as it will
-control how the agent responds.
+control how the agent responds. You may want to exaggerate characteristics
+somewhat in order for them to be more apparent, likewise, you'll want to
+indicate how they should speak and request that they limit their output to a
+few sentences at most.
