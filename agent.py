@@ -24,6 +24,20 @@ class Agent(ABC):
         raise NotImplementedError
 
 
+class DummyAgent(Agent):
+    """
+    A dummy AI Agent that always returns a given message
+    """
+
+    def __init__(self, name: str, message: str):
+        self.name: str = name
+        self.message: str = message
+
+    @override
+    def respond(self, messages: ChatMessages) -> ChatMessage:
+        return ChatMessage.speech(self.name, self.message)
+
+
 class OpenAIAgent(Agent):
     """
     An AI Agent built using the OpenAI API.
