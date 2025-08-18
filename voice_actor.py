@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Iterable, List, Optional, Set, Union, override
 
+import onnxruntime as ort
 from openai import OpenAI
 from piper.voice import PiperVoice
 
@@ -58,7 +59,14 @@ class PiperVoiceActor(VoiceActor):
             self.names: Set[str] = {names.casefold()}
         else:
             self.names: Set[str] = {n.casefold() for n in names}
-        self.voice: PiperVoice = PiperVoice.load(str(model_path))
+
+        # Use CUDA if possible, only works if installed onnxruntime-gpu
+        providers = (
+            ["CUDAExecutionProvider", "CPUExecutionProvider"]
+            if "CUDAExecutionProvider" in ort.get_available_providers()
+            else ["CPUExecutionProvider"]
+        )
+        self.voice: PiperVoice = PiperVoice.load(str(model_path), providers=providers)
         self.speaker: str = speaker
         if not speaker:
             self.speaker = self.voice.speakers[0]
