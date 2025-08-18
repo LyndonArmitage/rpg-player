@@ -30,7 +30,7 @@ uv run python main.py
 A `requirements.txt` is automatically generated with:
 
 ```sh
-uv export--format=requirements.txt --output-file=requirements.txt
+uv export --frozen --output-file=requirements.txt
 ```
 
 This file will only be used if you aren't using `uv`, e.g. using `venv` and
