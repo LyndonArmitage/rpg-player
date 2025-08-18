@@ -6,13 +6,27 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Iterable, List, Optional, Set, Union, override
 
-import onnxruntime as ort
 from openai import OpenAI
-from piper.voice import PiperVoice
+from piper.voice import PiperVoice, SynthesisConfig
 
 from chat_message import ChatMessage, MessageType
 
 log = logging.getLogger(__name__)
+
+
+def _parse_names(names: Union[str, Iterable[str]]) -> Set[str]:
+    # Normalize names into a set of casefolded strings
+    if isinstance(names, str):
+        norm_names: Set[str] = {names.casefold()}
+    else:
+        # Ensure it's an iterable of strings
+        try:
+            norm_names = {n.casefold() for n in names}  # type: ignore[arg-type]
+        except TypeError:
+            raise TypeError("names must be a string or an iterable of strings")
+        if not all(isinstance(n, str) for n in names):  # type: ignore[iterable-issue]
+            raise TypeError("all elements of 'names' must be strings")
+    return norm_names
 
 
 class VoiceActor(ABC):
@@ -52,24 +66,11 @@ class PiperVoiceActor(VoiceActor):
         self,
         names: Union[str, Iterable[str]],
         model_path: Path,
-        speaker: Optional[str] = None,
+        speaker_id: Optional[int] = None,
     ):
-        self.names: Set[str] = []
-        if isinstance(names, (list, tuple, set)):
-            self.names: Set[str] = {names.casefold()}
-        else:
-            self.names: Set[str] = {n.casefold() for n in names}
-
-        # Use CUDA if possible, only works if installed onnxruntime-gpu
-        providers = (
-            ["CUDAExecutionProvider", "CPUExecutionProvider"]
-            if "CUDAExecutionProvider" in ort.get_available_providers()
-            else ["CPUExecutionProvider"]
-        )
-        self.voice: PiperVoice = PiperVoice.load(str(model_path), providers=providers)
-        self.speaker: str = speaker
-        if not speaker:
-            self.speaker = self.voice.speakers[0]
+        self.names: Set[str] = _parse_names(names)
+        self.voice: PiperVoice = PiperVoice.load(str(model_path))
+        self.syn_config = SynthesisConfig(speaker_id=speaker_id)
 
     @override
     def should_speak_message(self, message: ChatMessage) -> bool:
@@ -84,12 +85,20 @@ class PiperVoiceActor(VoiceActor):
 
         out_path = None
         with tempfile.NamedTemporaryFile(
-            dir=folder_path, suffix=self.file_suffix, delete=False
+            dir=folder_path, suffix=".wav", delete=False
         ) as f:
             out_path = Path(f.name)
 
-        with wave.open(out_path, "wb") as wf:
-            self.voice.synthesize_wav(message.content, wf, speaker=self.speaker)
+        text = (message.content or "").strip()
+
+        with wave.open(str(out_path), "wb") as wf:
+            wf.setnchannels(1)  # Piper outputs mono
+            wf.setsampwidth(2)  # 16-bit PCM
+            wf.setframerate(self.voice.config.sample_rate)
+
+            if text:
+                for chunk in self.voice.synthesize(text, syn_config=self.syn_config):
+                    wf.writeframes(chunk.audio_int16_bytes)
         return out_path
 
 
@@ -147,11 +156,7 @@ class OpenAIVoiceActor(VoiceActor):
         response_format: str = "wav",
         instructions: Optional[str] = None,
     ):
-        self.names: Set[str] = []
-        if isinstance(names, (list, tuple, set)):
-            self.names: Set[str] = {names.casefold()}
-        else:
-            self.names: Set[str] = {n.casefold() for n in names}
+        self.names: Set[str] = _parse_names(names)
         self.openai = openai
         self.model = model
         self.voice = voice

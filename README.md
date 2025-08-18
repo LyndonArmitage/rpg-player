@@ -36,6 +36,14 @@ uv export --frozen --output-file=requirements.txt
 This file will only be used if you aren't using `uv`, e.g. using `venv` and
 `pip`.
 
+To run the tests you will need to download a `piper-tts` model with:
+
+```sh
+mkdir piper-models
+cd piper-models
+uv run python -m piper.download_voices en_US-lessac-medium
+```
+
 ## Structure
 
 This system can be viewed as a state machine with the following states:
