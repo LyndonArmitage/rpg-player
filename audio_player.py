@@ -75,6 +75,8 @@ class SoundDevicePlayer(AudioPlayer):
         self._frames_played: int = 0
         self._samplerate: int = 0
         self._duration: float = 0.0
+        # loop sets this when it observes paused
+        self._pause_ack = threading.Event()
 
     @override
     def register_progress_callback(self, callback: Callable[[float, float], None]):
@@ -110,7 +112,10 @@ class SoundDevicePlayer(AudioPlayer):
                         if self._stop_flag.is_set():
                             # Stop playing
                             break
-                        self._unpaused.wait()
+                        if not self._unpaused.is_set():
+                            self._pause_ack.set()
+                            self._unpaused.wait()
+                            continue
                         stream.write(block)
                         self._frames_played += len(block)
                         if self._progress_callback and self._samplerate > 0:
@@ -136,7 +141,9 @@ class SoundDevicePlayer(AudioPlayer):
 
     @override
     def pause(self):
+        self._pause_ack.clear()
         self._unpaused.clear()
+        self._pause_ack.wait(timeout=0.5)
         log.info("Pausing playback")
 
     @override
