@@ -102,12 +102,17 @@ class StateMachine:
         response: ChatMessage = agent.respond(self.messages)
         # Add the message to our container
         self.add_message(response)
-        voice_paths: List[Path] = self.voice_actors.process_message(response)
+        self.play_message(response)
+
+    def play_message(self, message: ChatMessage):
+        voice_paths: List[Path] = self.voice_actors.process_message(message)
         if voice_paths:
             voice_count: int = len(voice_paths)
             if voice_count > 1:
                 log.warning(f"Multiple voice files, will play first: {voice_paths}")
             self.play_audio(voice_paths[0])
+        else:
+            log.warning(f"No actor for message from {message.author} {message.msg_id}")
 
     def play_audio(self, path: Path):
         log.debug(f"Playing audio: {path}")
