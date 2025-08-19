@@ -108,7 +108,7 @@ class SoundDevicePlayer(AudioPlayer):
                     samplerate=f.samplerate, channels=f.channels
                 ) as stream:
                     self._samplerate = f.samplerate
-                    for block in f.blocks(blocksize=self._blocksize):
+                    for block in f.blocks(blocksize=self._blocksize, dtype="float32"):
                         if self._stop_flag.is_set():
                             # Stop playing
                             break
