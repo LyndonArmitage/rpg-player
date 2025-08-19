@@ -71,6 +71,19 @@ class PiperVoiceActor(VoiceActor):
         self.names: Set[str] = _parse_names(names)
         self.voice: PiperVoice = PiperVoice.load(str(model_path))
         self.syn_config = SynthesisConfig(speaker_id=speaker_id)
+        self.speaker_map: dict = dict()
+
+    def set_speaker_id_for(self, name: str, speaker_id: int):
+        """
+        Allows you to override the speaker_id for a given name.
+
+        This is useful if the model used has multiple speakers and you want to
+        reuse the single instance.
+        """
+        if name in self.names:
+            self.speaker_map[name] = speaker_id
+        else:
+            raise ValueError(f"{name} is not a valid name for this actor")
 
     @override
     def should_speak_message(self, message: ChatMessage) -> bool:
@@ -97,7 +110,12 @@ class PiperVoiceActor(VoiceActor):
             wf.setframerate(self.voice.config.sample_rate)
 
             if text:
-                for chunk in self.voice.synthesize(text, syn_config=self.syn_config):
+                config = self.syn_config
+                if message.author in self.speaker_map:
+                    config = SynthesisConfig(
+                        speaker_id=self.speaker_map[message.author]
+                    )
+                for chunk in self.voice.synthesize(text, syn_config=config):
                     wf.writeframes(chunk.audio_int16_bytes)
         return out_path
 
