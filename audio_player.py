@@ -105,7 +105,10 @@ class SoundDevicePlayer(AudioPlayer):
         try:
             with sf.SoundFile(path) as f:
                 with sd.OutputStream(
-                    samplerate=f.samplerate, channels=f.channels
+                    samplerate=f.samplerate,
+                    channels=f.channels,
+                    latency="high",
+                    dtype="float32",
                 ) as stream:
                     self._samplerate = f.samplerate
                     for block in f.blocks(blocksize=self._blocksize, dtype="float32"):
@@ -113,9 +116,21 @@ class SoundDevicePlayer(AudioPlayer):
                             # Stop playing
                             break
                         if not self._unpaused.is_set():
+                            stream.stop()
                             self._pause_ack.set()
-                            self._unpaused.wait()
-                            continue
+
+                            # Sleep efficiently until resume or stop
+                            while not self._stop_flag.is_set():
+                                if self._unpaused.wait(
+                                    timeout=0.1
+                                ):  # returns True if set (resumed)
+                                    break
+
+                            if self._stop_flag.is_set():
+                                break
+                            # Resume the stream and starts writing the same block
+                            stream.start()
+
                         stream.write(block)
                         self._frames_played += len(block)
                         if self._progress_callback and self._samplerate > 0:
