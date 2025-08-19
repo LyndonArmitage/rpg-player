@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Callable, List, Optional
 
 from agent import Agent
+from audio_player import SoundDevicePlayer
 from chat_message import ChatMessage, ChatMessages
 from voice_actor import VoiceActorManager
 
@@ -42,10 +43,19 @@ class StateMachine:
         voice_actors: VoiceActorManager,
         message_listener: Optional[Callable[[ChatMessage], None]] = None,
         messages_file: Optional[Path] = None,
+        delete_audio: bool = True,
     ):
         self.messages: ChatMessages = ChatMessages()
         self.agents: List[Agent] = agents
         self.voice_actors: VoiceActorManager = voice_actors
+        self.player: SoundDevicePlayer = SoundDevicePlayer()
+        if delete_audio:
+
+            def delete_path(path: Path):
+                log.debug(f"Deleting {path}")
+                path.unlink(missing_ok=True)
+
+            self.player.register_finished_callback(delete_path)
 
         self.message_listener: Optional[Callable[[ChatMessage], None]] = (
             message_listener
@@ -94,19 +104,16 @@ class StateMachine:
         self.add_message(response)
         voice_paths: List[Path] = self.voice_actors.process_message(response)
         if voice_paths:
-            # TODO: Play the voice acting
             voice_count: int = len(voice_paths)
             if voice_count > 1:
                 log.warning(f"Multiple voice files, will play first: {voice_paths}")
             self.play_audio(voice_paths[0])
 
-    def play_audio(self, path: Path, delete_after: bool = False):
+    def play_audio(self, path: Path):
         log.debug(f"Playing audio: {path}")
-        # TODO: Play audio
-        if delete_after:
-            log.debug(f"Deleting {path}")
-            path.unlink(missing_ok=True)
+        if self.player.is_playing or self.player.is_paused:
+            self.player.stop_audio()
+        self.player.play_file(path)
 
     def stop_audio(self):
-        # TODO: Stop audio if it is playing
-        pass
+        self.player.stop_audio()

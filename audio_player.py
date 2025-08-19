@@ -32,6 +32,16 @@ class AudioPlayer(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def register_finished_callback(self, callback: Callable[[Path], None]):
+        """
+        Registers a callback that the implementations should call after
+        playback.
+
+        The callback is given the path of the audio file.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def play_file(self, path: Path):
         raise NotImplementedError
 
@@ -72,6 +82,7 @@ class SoundDevicePlayer(AudioPlayer):
         self._unpaused: threading.Event = threading.Event()
         self._blocksize: int = blocksize
         self._progress_callback: Optional[Callable[[float, float], None]] = None
+        self._finished_callback: Optional[Callable[[Path], None]] = None
         self._frames_played: int = 0
         self._samplerate: int = 0
         self._duration: float = 0.0
@@ -83,9 +94,13 @@ class SoundDevicePlayer(AudioPlayer):
         self._progress_callback = callback
 
     @override
+    def register_finished_callback(self, callback: Callable[[Path], None]):
+        self._finished_callback = callback
+
+    @override
     def play_file(self, path: Path) -> bool:
-        if self.is_playing:
-            log.warning(f"Tried to play {path} when already playing")
+        if self.is_active:
+            log.warning(f"Tried to play {path} when already active")
             return False
         self._stop_flag.clear()
         self._unpaused.set()
@@ -142,6 +157,11 @@ class SoundDevicePlayer(AudioPlayer):
             self._thread = None
             self._stop_flag.clear()
             log.info(f"Playback of {path} finished or stopped")
+            if self._finished_callback:
+                try:
+                    self._finished_callback(path)
+                except Exception:
+                    log.exception("finished call back failed")
 
     @override
     def stop_audio(self):
@@ -169,13 +189,14 @@ class SoundDevicePlayer(AudioPlayer):
     @property
     @override
     def is_playing(self) -> bool:
-        return bool(
-            self._thread and self._thread.is_alive() and self._unpaused.is_set()
-        )
+        return bool(self.is_active and self._unpaused.is_set())
 
     @property
     @override
     def is_paused(self) -> bool:
-        return bool(
-            self._thread and self._thread.is_alive() and not self._unpaused.is_set()
-        )
+        return bool(self.is_active and not self._unpaused.is_set())
+
+    @property
+    def is_active(self) -> bool:
+        # True if a playback thread exists (playing or paused)
+        return bool(self._thread and self._thread.is_alive())
