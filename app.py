@@ -1,10 +1,12 @@
 import asyncio
+import logging
 from random import Random
 from typing import List
 
 from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll
+from textual.logging import TextualHandler
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Markdown, Rule
 
@@ -117,6 +119,10 @@ class Standby(Screen):
 class MainApp(App):
     TITLE = "RPG Party"
 
+    def on_start(self):
+        setup_logging()
+        logging.getLogger().addHandler(TextualHandler())
+
     def on_ready(self) -> None:
         agents: List[Agent] = [
             DummyAgent("Bob", "I am Bob"),
@@ -135,6 +141,5 @@ class MainApp(App):
 
 
 if __name__ == "__main__":
-    setup_logging()
     app = MainApp()
     app.run()
