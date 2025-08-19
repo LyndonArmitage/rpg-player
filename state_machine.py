@@ -89,7 +89,7 @@ class StateMachine:
     def agent_names(self) -> List[str]:
         return [a.name for a in self.agents]
 
-    def agent_respond(self, index: int):
+    def agent_respond(self, index: int) -> ChatMessage:
         """
         Given an agent index, asks the agent to respond
         """
@@ -103,6 +103,7 @@ class StateMachine:
         # Add the message to our container
         self.add_message(response)
         self.play_message(response)
+        return response
 
     def play_message(self, message: ChatMessage):
         voice_paths: List[Path] = self.voice_actors.process_message(message)

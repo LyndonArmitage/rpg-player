@@ -216,7 +216,7 @@ class VoiceActorManager:
     """
 
     def __init__(self):
-        self.actors: Set[VoiceActor] = []
+        self.actors: Set[VoiceActor] = set()
         self._tmp: tempfile.TemporaryDirectory = tempfile.TemporaryDirectory(
             prefix="rpg-voices"
         )
@@ -255,7 +255,7 @@ class VoiceActorManager:
         normally be a single file, but multiple files may be written, either by
         differnt voice actors or the same voice actor.
         """
-        log.debug(f"Processing message: {message.id}")
+        log.debug(f"Processing message: {message.msg_id}")
         paths: List[Path] = []
         for actor in self.actors:
             if actor.should_speak_message(message):

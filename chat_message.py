@@ -1,7 +1,7 @@
 import enum
 import uuid
 from dataclasses import dataclass, field
-from typing import Iterable, Iterator, List
+from typing import Iterable, Iterator, List, Optional
 
 
 class MessageType(enum.Enum):
@@ -99,3 +99,10 @@ class ChatMessages:
     @property
     def as_openai(self) -> List[dict]:
         return self._openai_messages
+
+    @property
+    def last(self) -> Optional[ChatMessage]:
+        if self.messages:
+            return self.messages[-1]
+        else:
+            return None
