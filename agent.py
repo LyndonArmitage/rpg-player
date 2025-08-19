@@ -13,6 +13,14 @@ class Agent(ABC):
     AI Agents are fed the current messages and generate a response to them.
     """
 
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """
+        The name of the agent
+        """
+        raise NotImplementedError
+
     @abstractmethod
     def respond(self, messages: ChatMessages) -> ChatMessage:
         """
@@ -30,12 +38,17 @@ class DummyAgent(Agent):
     """
 
     def __init__(self, name: str, message: str):
-        self.name: str = name
+        self._name: str = name
         self.message: str = message
+
+    @property
+    @override
+    def name(self) -> str:
+        return self._name
 
     @override
     def respond(self, messages: ChatMessages) -> ChatMessage:
-        return ChatMessage.speech(self.name, self.message)
+        return ChatMessage.speech(self._name, self.message)
 
 
 class OpenAIAgent(Agent):
@@ -56,12 +69,17 @@ class OpenAIAgent(Agent):
         max_tokens: int = 300,
     ):
         self.openai: OpenAI = openai
-        self.name: str = name
+        self._name: str = name
         self.system_prompt: str = system_prompt
         self.model: str = model
         self.temperature: float = temperature
         self.max_tokens: int = max_tokens
         self.system_message: dict = OpenAIAgent._gen_system_message(system_prompt)
+
+    @property
+    @override
+    def name(self) -> str:
+        return self._name
 
     @staticmethod
     def _gen_system_message(prompt: str) -> dict:
@@ -80,4 +98,4 @@ class OpenAIAgent(Agent):
             max_output_tokens=self.max_tokens,
         )
         output_text = response.output_text
-        return ChatMessage.speech(self.name, output_text)
+        return ChatMessage.speech(self._name, output_text)

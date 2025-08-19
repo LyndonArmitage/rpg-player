@@ -37,6 +37,20 @@ class ChatMessage:
     def system(cls, author: str, content: str) -> "ChatMessage":
         return cls(str(uuid.uuid4()), author, MessageType.SYSTEM, content)
 
+    @staticmethod
+    def from_dict(d: dict) -> "ChatMessage":
+        return ChatMessage(
+            d["msg_id"], d["author"], MessageType(d["type"]), d["content"]
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "msg_id": self.msg_id,
+            "author": self.author,
+            "type": self.type.value,
+            "content": self.content,
+        }
+
 
 class ChatMessages:
     """
