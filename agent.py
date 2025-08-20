@@ -66,9 +66,9 @@ class OpenAIAgent(Agent):
         name: str,
         path: Union[Path, str],
         openai: OpenAI,
-        model: str = "gpt-4",
+        model: str = "gpt-4.1",
         temperature: float = 0.4,
-        max_tokens: int = 300,
+        max_tokens: int = 3000,
         prefix_path: Optional[Union[Path, str]] = None,
         suffix_path: Optional[Union[Path, str]] = None,
     ) -> "OpenAIAgent":
@@ -103,9 +103,9 @@ class OpenAIAgent(Agent):
         openai: OpenAI,
         name: str,
         system_prompt: str,
-        model: str = "gpt-4",
+        model: str = "gpt-4.1",
         temperature: float = 0.4,
-        max_tokens: int = 300,
+        max_tokens: int = 3000,
     ):
         self.openai: OpenAI = openai
         self._name: str = name
@@ -113,7 +113,7 @@ class OpenAIAgent(Agent):
         self.model: str = model
         self.temperature: float = temperature
         self.max_tokens: int = max_tokens
-        self.system_message: dict = OpenAIAgent._gen_system_message(system_prompt, name)
+        self.system_message: str = OpenAIAgent._gen_system_message(system_prompt, name)
         self.log = logging.getLogger(f"OpenAIAgent-{name}")
 
     @property
@@ -122,22 +122,46 @@ class OpenAIAgent(Agent):
         return self._name
 
     @staticmethod
-    def _gen_system_message(prompt: str, name: str) -> dict:
+    def _gen_system_message(prompt: str, name: str) -> str:
         name_reminder = f"Your name will show up in messages as: {name}"
-        return {"role": "developer", "content": f"{prompt}\n\n{name_reminder}"}
+        return f"{prompt}\n\n{name_reminder}"
 
     @override
     def respond(self, messages: ChatMessages) -> ChatMessage:
-        request_msgs: List[dict] = [self.system_message]
-        request_msgs.extend(messages.as_openai)
+        request_msgs: List[dict] = messages.as_openai
         response = self.openai.responses.create(
             model=self.model,
             input=request_msgs,
+            instructions=self.system_message,
             # temperature=self.temperature,
             tool_choice="none",
             stream=False,
             max_output_tokens=self.max_tokens,
         )
-        output_text = response.output_text
-        self.log.debug(f"Response: {response}")
+        output_text = OpenAIAgent._extract_text(response)
+        if not output_text:
+            self.log.warning(
+                "No assistant message in response; got: %s", response.output
+            )
         return ChatMessage.speech(self._name, output_text)
+
+    def _extract_text(response) -> str:
+        # Prefer walking the structured output
+        out = getattr(response, "output", None) or []
+        collected: list[str] = []
+
+        for item in out:
+            # GPT-4/GPT-5 both use 'message' items for assistant replies
+            if getattr(item, "type", None) == "message":
+                # item.content is a list of blocks; we want output_text blocks
+                for block in getattr(item, "content", []) or []:
+                    if getattr(block, "type", None) == "output_text":
+                        txt = getattr(block, "text", "") or ""
+                        if txt:
+                            collected.append(txt)
+
+        if collected:
+            return "\n".join(collected).strip()
+
+        # Fallback for SDK helpers that sometimes populate this
+        return (getattr(response, "output_text", "") or "").strip()
