@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import List, override
+from pathlib import Path
+from typing import List, Optional, Union, override
 
 from openai import OpenAI
 
@@ -59,6 +60,43 @@ class OpenAIAgent(Agent):
     system prompt.
     """
 
+    @staticmethod
+    def load_prompt(
+        name: str,
+        path: Union[Path, str],
+        openai: OpenAI,
+        model: str = "gpt-5",
+        temperature: float = 0.4,
+        max_tokens: int = 300,
+        prefix_path: Optional[Union[Path, str]] = None,
+        suffix_path: Optional[Union[Path, str]] = None,
+    ) -> "OpenAIAgent":
+        """
+        Create an agent, loading the prompt from a file.
+
+        Optionally can load a prefix prompt and suffix prompt which will be
+        added before and after the main prompt respectively.
+        """
+        if not isinstance(path, Path):
+            path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"{path} does not exist")
+        system_prompt: str = path.read_text()
+
+        if prefix_path:
+            if not isinstance(prefix_path, Path):
+                prefix_path: Path = Path(prefix_path)
+            prefix_prompt: str = prefix_path.read_text()
+            system_prompt = prefix_prompt + "\n" + system_prompt
+
+        if suffix_path:
+            if not isinstance(suffix_path, Path):
+                suffix_path: Path = Path(suffix_path)
+            suffix_prompt: str = suffix_path.read_text()
+            system_prompt = system_prompt + "\n" + suffix_prompt
+
+        return OpenAIAgent(openai, name, system_prompt, model, temperature, max_tokens)
+
     def __init__(
         self,
         openai: OpenAI,
@@ -74,7 +112,7 @@ class OpenAIAgent(Agent):
         self.model: str = model
         self.temperature: float = temperature
         self.max_tokens: int = max_tokens
-        self.system_message: dict = OpenAIAgent._gen_system_message(system_prompt)
+        self.system_message: dict = OpenAIAgent._gen_system_message(system_prompt, name)
 
     @property
     @override
@@ -82,8 +120,9 @@ class OpenAIAgent(Agent):
         return self._name
 
     @staticmethod
-    def _gen_system_message(prompt: str) -> dict:
-        return {"role": "developer", "content": prompt}
+    def _gen_system_message(prompt: str, name: str) -> dict:
+        name_reminder = f"Your name will show up in messages as: {name}"
+        return {"role": "developer", "content": f"{prompt}\n\n{name_reminder}"}
 
     @override
     def respond(self, messages: ChatMessages) -> ChatMessage:

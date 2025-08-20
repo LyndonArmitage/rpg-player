@@ -61,6 +61,7 @@ class ChatMessages:
 
     @staticmethod
     def convert_to_openai(message: ChatMessage) -> dict:
+        msg_author: str = message.author
         role = "assistant"
         match message.type:
             case MessageType.SPEECH:
@@ -69,7 +70,7 @@ class ChatMessages:
                 role = "user"
             case MessageType.SYSTEM:
                 role = "developer"
-        return {"role": role, "content": message.content}
+        return {"role": role, "content": f"{msg_author}: {message.content}"}
 
     def __init__(self):
         self.messages: List[ChatMessage] = []

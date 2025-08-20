@@ -81,7 +81,6 @@ class StateMachine:
             with self.messages_file.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(message.as_dict()))
                 f.write("\n")
-            pass
         if self.message_listener:
             self.message_listener(message)
 
