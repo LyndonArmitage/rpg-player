@@ -1,8 +1,10 @@
 import time
-from abc import ABC, abstractmethod, override
+from abc import ABC, abstractmethod
 from pathlib import Path
 from random import Random
-from typing import Callable, Iterable, List, Optional, Union
+from typing import Callable, Iterable, List, Optional, Union, override
+
+from openai import OpenAI
 
 
 class AudioTranscriber(ABC):
@@ -44,6 +46,68 @@ class AudioTranscriber(ABC):
         completed or not.
         """
         raise NotImplementedError
+
+
+class OpenAIAudioTranscriber(AudioTranscriber):
+
+    def __init__(self, openai: OpenAI, model: str = "whisper-1"):
+        """
+        :param openai: OpenAI SDK client
+        :param model: Name of Whisper model to use (default: "whisper-1")
+        """
+        self.openai = openai
+        self.model = model
+
+    @override
+    def transcribe(self, file: Path) -> str:
+        """Transcribe an audio file using the OpenAI Whisper API."""
+        if not file.exists():
+            raise FileNotFoundError(f"Audio file does not exist: {file}")
+        try:
+            with file.open("rb") as audio_fp:
+                response = self.openai.audio.transcriptions.create(
+                    model=self.model, file=audio_fp
+                )
+            return response.text
+        except Exception as e:
+            raise RuntimeError(f"Transcription failed: {e}")
+
+    @property
+    @override
+    def supports_async_out(self) -> bool:
+        """Whether async transcription is supported (streaming via OpenAI API)."""
+        return self.model != "whisper-1"
+
+    @override
+    def transcribe_async_out(
+        self, file: Path, handler: Callable[[Path, str, bool], None]
+    ):
+        """
+        Streams transcription chunks from the OpenAI API and calls the handler
+        for each chunk.
+        """
+        if self.model == "whisper-1":
+            raise ValueError("whisper-1 model does not support streaming")
+        if not file.exists():
+            raise FileNotFoundError(f"Audio file does not exist: {file}")
+        try:
+            with file.open("rb") as audio_fp:
+                stream = self.openai.audio.transcriptions.create(
+                    model=self.model, file=audio_fp, stream=True
+                )
+                full_text = ""
+                for event in stream:
+                    delta = getattr(event, "delta", None)
+                    # event type could be 'transcript.text.delta' or
+                    # 'transcript.text.done', etc.
+                    # Only handle 'delta' events incrementally
+                    if delta:
+                        full_text += delta
+                        handler(file, delta, False)
+                # At the end, report everything with done=True
+                handler(file, full_text, True)
+        except Exception as e:
+            raise RuntimeError(f"Streaming transcription failed: {e}")
 
 
 class DummyAudioTranscriber(AudioTranscriber):
