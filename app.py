@@ -115,6 +115,8 @@ class Standby(Screen):
         if len(self.state_machine.messages) == 0:
             return self.action_random_respond()
         last_msg: ChatMessage = self.state_machine.messages.last
+        if last_msg.author not in self.agent_names:
+            return self.action_random_respond()
         bad_index = self.agent_names.index(last_msg.author)
         index = bad_index
         while index == bad_index:
