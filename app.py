@@ -10,6 +10,8 @@ from textual.logging import TextualHandler
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Markdown, Rule
 
+from narration_screen import NarrationScreen
+
 from agent import Agent, DummyAgent
 from chat_message import ChatMessage
 from main import setup_logging
@@ -79,9 +81,14 @@ class Standby(Screen):
         self.action_agent_respond(2)
 
     def action_enter_narrate(self) -> None:
-        msg = "**DM:** Test message."
-        self.call_after_refresh(lambda: asyncio.create_task(self.add_message(msg)))
-        # TODO
+        def on_narrate_done(result):
+            if result:
+                msg = f"**DM:** {result}"
+                self.call_after_refresh(
+                    lambda: asyncio.create_task(self.add_message(msg))
+                )
+
+        self.app.push_screen(NarrationScreen(title="Narrate"), on_narrate_done)
 
     def action_agent_respond(self, index: int) -> None:
         self.agent_respond(index)
