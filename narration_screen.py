@@ -18,8 +18,8 @@ class TranscriptionChunk:
 
 class NarrationScreen(Screen):
     BINDINGS = [
-        ("r", "toggle_record", "Record/Stop"),
-        ("ctrl+enter", "accept", "Accept"),
+        ("ctrl+r", "toggle_record", "Record/Stop"),
+        ("ctrl+j", "accept", "Accept"),
         ("escape", "cancel", "Cancel"),
         ("ctrl+k", "clear", "Clear"),
     ]
