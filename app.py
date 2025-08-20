@@ -103,6 +103,7 @@ class Standby(Screen):
         msg = self.state_machine.agent_respond(number)
         text = f"**{msg.author}:** {msg.content}"
         self.call_after_refresh(lambda: asyncio.create_task(self.add_message(text)))
+        self.state_machine.play_message(msg)
 
     def action_random_respond(self) -> None:
         i = self.random.randint(0, len(self.agent_names) - 1)

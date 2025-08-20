@@ -101,7 +101,6 @@ class StateMachine:
         response: ChatMessage = agent.respond(self.messages)
         # Add the message to our container
         self.add_message(response)
-        self.play_message(response)
         return response
 
     def play_message(self, message: ChatMessage):
