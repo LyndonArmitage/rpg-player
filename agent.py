@@ -66,7 +66,7 @@ class OpenAIAgent(Agent):
         name: str,
         path: Union[Path, str],
         openai: OpenAI,
-        model: str = "gpt-5",
+        model: str = "gpt-4",
         temperature: float = 0.4,
         max_tokens: int = 300,
         prefix_path: Optional[Union[Path, str]] = None,
@@ -103,7 +103,7 @@ class OpenAIAgent(Agent):
         openai: OpenAI,
         name: str,
         system_prompt: str,
-        model: str = "gpt-5",
+        model: str = "gpt-4",
         temperature: float = 0.4,
         max_tokens: int = 300,
     ):
