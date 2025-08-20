@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional, Union, override
@@ -113,6 +114,7 @@ class OpenAIAgent(Agent):
         self.temperature: float = temperature
         self.max_tokens: int = max_tokens
         self.system_message: dict = OpenAIAgent._gen_system_message(system_prompt, name)
+        self.log = logging.getLogger(f"OpenAIAgent-{name}")
 
     @property
     @override
@@ -131,10 +133,11 @@ class OpenAIAgent(Agent):
         response = self.openai.responses.create(
             model=self.model,
             input=request_msgs,
-            temperature=self.temperature,
+            # temperature=self.temperature,
             tool_choice="none",
             stream=False,
             max_output_tokens=self.max_tokens,
         )
         output_text = response.output_text
+        self.log.debug(f"Response: {response}")
         return ChatMessage.speech(self._name, output_text)

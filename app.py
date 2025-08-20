@@ -131,10 +131,6 @@ class Standby(Screen):
 class MainApp(App):
     TITLE = "RPG Party"
 
-    def on_start(self):
-        setup_logging()
-        logging.getLogger().addHandler(TextualHandler())
-
     def on_ready(self) -> None:
 
         openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
@@ -195,5 +191,7 @@ class MainApp(App):
 
 if __name__ == "__main__":
     load_dotenv()
+    setup_logging()
+    logging.getLogger().addHandler(TextualHandler())
     app = MainApp()
     app.run()

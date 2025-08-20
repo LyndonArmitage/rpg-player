@@ -80,10 +80,16 @@ class PiperVoiceActor(VoiceActor):
         This is useful if the model used has multiple speakers and you want to
         reuse the single instance.
         """
+        name = name.casefold()
         if name in self.names:
             self.speaker_map[name] = speaker_id
         else:
-            raise ValueError(f"{name} is not a valid name for this actor")
+            raise ValueError(
+                (
+                    f"{name} is not a valid name for this actor, "
+                    f"valid names are {self.names}"
+                )
+            )
 
     @override
     def should_speak_message(self, message: ChatMessage) -> bool:
