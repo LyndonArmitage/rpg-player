@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 from random import Random
 from typing import List, Optional
@@ -15,7 +16,6 @@ from textual.widgets import Button, Footer, Header, Markdown, Rule
 
 from agent import Agent, OpenAIAgent
 from chat_message import ChatMessage
-from main import setup_logging
 from narration_screen import NarrationScreen
 from state_machine import StateMachine
 from voice_actor import PiperVoiceActor, VoiceActorManager
@@ -195,9 +195,23 @@ class MainApp(App):
         self.push_screen("standby")
 
 
+def setup_logging(level: int = logging.INFO, logfile: str | None = None) -> None:
+    handlers: List[logging.Handler] = [TextualHandler()]
+    if logfile:
+        file_handler = RotatingFileHandler(
+            logfile, maxBytes=10_000_000, backupCount=3, encoding="utf-8"
+        )
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+        )
+        handlers.append(file_handler)
+    logging.basicConfig(level=level, handlers=handlers, force=True)
+    logging.captureWarnings(True)
+
+
 if __name__ == "__main__":
     load_dotenv()
     setup_logging()
-    logging.getLogger().addHandler(TextualHandler())
     app = MainApp()
     app.run()
