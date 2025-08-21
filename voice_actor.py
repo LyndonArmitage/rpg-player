@@ -4,7 +4,7 @@ import tempfile
 import wave
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Iterable, List, Optional, Set, Union, override
+from typing import Dict, Iterable, List, Optional, Set, Union, override
 
 from openai import OpenAI
 from piper.voice import PiperVoice, SynthesisConfig
@@ -50,6 +50,14 @@ class VoiceActor(ABC):
         """
         raise NotImplementedError
 
+    @property
+    @abstractmethod
+    def speaker_names(self) -> Set[str]:
+        """
+        The speaker names this voice actor will work for
+        """
+        raise NotImplementedError
+
 
 class PiperVoiceActor(VoiceActor):
     """
@@ -62,6 +70,20 @@ class PiperVoiceActor(VoiceActor):
     voice.
     """
 
+    @classmethod
+    def with_all_speaker_ids(cls, model_path: Path) -> "PiperVoiceActor":
+        """
+        Create an instance with names corresponding to the voice integers
+        """
+        # Loads twice to get all speaker ids
+        voice: PiperVoice = PiperVoice.load(str(model_path))
+        speaker_count = voice.config.num_speakers
+        voice = None
+        id_map = {str(i): i for i in range(speaker_count)}
+        output = cls(id_map.keys(), model_path)
+        output.speaker_map = id_map
+        return output
+
     def __init__(
         self,
         names: Union[str, Iterable[str]],
@@ -71,7 +93,8 @@ class PiperVoiceActor(VoiceActor):
         self.names: Set[str] = _parse_names(names)
         self.voice: PiperVoice = PiperVoice.load(str(model_path))
         self.syn_config = SynthesisConfig(speaker_id=speaker_id)
-        self.speaker_map: dict = dict()
+        self.speaker_map: Dict[str, int] = dict()
+        self.number_of_speakers: int = self.voice.config.num_speakers
 
     def set_speaker_id_for(self, name: str, speaker_id: int):
         """
@@ -90,6 +113,11 @@ class PiperVoiceActor(VoiceActor):
                     f"valid names are {self.names}"
                 )
             )
+
+    @property
+    @override
+    def speaker_names(self) -> Set[str]:
+        return self.names
 
     @override
     def should_speak_message(self, message: ChatMessage) -> bool:
@@ -117,9 +145,10 @@ class PiperVoiceActor(VoiceActor):
 
             if text:
                 config = self.syn_config
-                if message.author in self.speaker_map:
+                author_casefold = message.author.casefold()
+                if author_casefold in self.speaker_map:
                     config = SynthesisConfig(
-                        speaker_id=self.speaker_map[message.author]
+                        speaker_id=self.speaker_map[author_casefold]
                     )
                 for chunk in self.voice.synthesize(text, syn_config=config):
                     wf.writeframes(chunk.audio_int16_bytes)
@@ -131,6 +160,14 @@ class EchoVoiceActor(VoiceActor):
     A simple test VoiceActor that will echo out all messages to the log and
     save a text copy of them to a temporay file.
     """
+
+    def __init__(self, names: Union[str, Iterable[str]]):
+        self.names = _parse_names(names)
+
+    @property
+    @override
+    def speaker_names(self) -> Set[str]:
+        return self.names
 
     @override
     def should_speak_message(self, message: ChatMessage) -> bool:
@@ -190,6 +227,11 @@ class OpenAIVoiceActor(VoiceActor):
             self.file_suffix = self._SUFFIX[response_format]
         except KeyError:
             raise ValueError(f"Unsupported response_format: {response_format!r}")
+
+    @property
+    @override
+    def speaker_names(self) -> Set[str]:
+        return self.names
 
     @override
     def should_speak_message(self, message: ChatMessage) -> bool:
