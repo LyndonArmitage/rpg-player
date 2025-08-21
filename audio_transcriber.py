@@ -66,7 +66,7 @@ class OpenAIAudioTranscriber(AudioTranscriber):
         try:
             with file.open("rb") as audio_fp:
                 response = self.openai.audio.transcriptions.create(
-                    model=self.model, file=audio_fp
+                    model=self.model, file=audio_fp, language="en"
                 )
             return response.text
         except Exception as e:
@@ -93,7 +93,7 @@ class OpenAIAudioTranscriber(AudioTranscriber):
         try:
             with file.open("rb") as audio_fp:
                 stream = self.openai.audio.transcriptions.create(
-                    model=self.model, file=audio_fp, stream=True
+                    model=self.model, file=audio_fp, stream=True, language="en"
                 )
                 full_text = ""
                 for event in stream:
