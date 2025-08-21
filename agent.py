@@ -67,10 +67,10 @@ class OpenAIAgent(Agent):
         path: Union[Path, str],
         openai: OpenAI,
         model: str = "gpt-4.1",
-        temperature: float = 0.4,
         max_tokens: int = 3000,
         prefix_path: Optional[Union[Path, str]] = None,
         suffix_path: Optional[Union[Path, str]] = None,
+        extra_kwargs: Optional[dict] = None,
     ) -> "OpenAIAgent":
         """
         Create an agent, loading the prompt from a file.
@@ -96,7 +96,9 @@ class OpenAIAgent(Agent):
             suffix_prompt: str = suffix_path.read_text()
             system_prompt = system_prompt + "\n" + suffix_prompt
 
-        return OpenAIAgent(openai, name, system_prompt, model, temperature, max_tokens)
+        return OpenAIAgent(
+            openai, name, system_prompt, model, max_tokens, extra_kwargs=extra_kwargs
+        )
 
     def __init__(
         self,
@@ -104,17 +106,43 @@ class OpenAIAgent(Agent):
         name: str,
         system_prompt: str,
         model: str = "gpt-4.1",
-        temperature: float = 0.4,
         max_tokens: int = 3000,
+        extra_kwargs: Optional[dict] = None,
     ):
         self.openai: OpenAI = openai
         self._name: str = name
         self.system_prompt: str = system_prompt
         self.model: str = model
-        self.temperature: float = temperature
         self.max_tokens: int = max_tokens
         self.system_message: str = OpenAIAgent._gen_system_message(system_prompt, name)
         self.log = logging.getLogger(f"OpenAIAgent-{name}")
+
+        reserved_keys = {
+            "model",
+            "input",
+            "instructions",
+            "tool_choice",
+            "stream",
+            "max_output_tokens",
+        }
+        extra_kwargs = extra_kwargs or {}
+        intersection = reserved_keys & extra_kwargs.keys()
+        if intersection:
+            raise ValueError(
+                (
+                    "extra_kwargs contains reserved keyword(s) "
+                    f"that will be overwritten: {sorted(intersection)}"
+                )
+            )
+        # Consolidate static params for responses.create
+        self.response_kwargs = {
+            "model": model,
+            "instructions": self.system_message,
+            "tool_choice": "none",
+            "stream": False,
+            "max_output_tokens": max_tokens,
+        }
+        self.response_kwargs.update(extra_kwargs)
 
     @property
     @override
@@ -130,13 +158,8 @@ class OpenAIAgent(Agent):
     def respond(self, messages: ChatMessages) -> ChatMessage:
         request_msgs: List[dict] = messages.as_openai
         response = self.openai.responses.create(
-            model=self.model,
             input=request_msgs,
-            instructions=self.system_message,
-            # temperature=self.temperature,
-            tool_choice="none",
-            stream=False,
-            max_output_tokens=self.max_tokens,
+            **self.response_kwargs,
         )
         output_text = OpenAIAgent._extract_text(response)
         if not output_text:
