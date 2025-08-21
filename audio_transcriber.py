@@ -50,13 +50,36 @@ class AudioTranscriber(ABC):
 
 class OpenAIAudioTranscriber(AudioTranscriber):
 
-    def __init__(self, openai: OpenAI, model: str = "whisper-1"):
+    def __init__(
+        self,
+        openai: OpenAI,
+        model: str = "whisper-1",
+        language: str = "en",
+        extra_kwargs: Optional[dict] = None,
+    ):
         """
         :param openai: OpenAI SDK client
         :param model: Name of Whisper model to use (default: "whisper-1")
+        :param language: Language name, should be 2 character code (default: "en")
+        :param extra_kwargs: Extra keyword arguments for transcription API call
         """
         self.openai = openai
         self.model = model
+
+        self.language = language
+        reserved_keys = {"model", "file", "language", "stream"}
+        extra_kwargs = extra_kwargs or {}
+        intersection = reserved_keys & extra_kwargs.keys()
+        if intersection:
+            raise ValueError(
+                (
+                    "extra_kwargs contains reserved keyword(s) "
+                    f"that will be overwritten: {sorted(intersection)}"
+                )
+            )
+        # All parameters that will be passed to API
+        self.transcription_kwargs = {"model": model, "language": language}
+        self.transcription_kwargs.update(extra_kwargs)
 
     @override
     def transcribe(self, file: Path) -> str:
@@ -66,7 +89,8 @@ class OpenAIAudioTranscriber(AudioTranscriber):
         try:
             with file.open("rb") as audio_fp:
                 response = self.openai.audio.transcriptions.create(
-                    model=self.model, file=audio_fp, language="en"
+                    file=audio_fp,
+                    **self.transcription_kwargs,
                 )
             return response.text
         except Exception as e:
@@ -92,8 +116,11 @@ class OpenAIAudioTranscriber(AudioTranscriber):
             raise FileNotFoundError(f"Audio file does not exist: {file}")
         try:
             with file.open("rb") as audio_fp:
+                stream_kwargs = dict(self.transcription_kwargs)
+                stream_kwargs["stream"] = True
                 stream = self.openai.audio.transcriptions.create(
-                    model=self.model, file=audio_fp, stream=True, language="en"
+                    file=audio_fp,
+                    **stream_kwargs,
                 )
                 full_text = ""
                 for event in stream:
