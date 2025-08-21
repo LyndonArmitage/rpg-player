@@ -22,14 +22,8 @@ years old. You have copper red scales.
 - You maintain connections with some of the downtrodden in various towns and
   cities across the land
 - You are respected by guards of many towns for your efficiency
-
-- You are a member of a wizarding school called: Globwarts
-- Your main tutor is Olaf the Great, he tries to teach you as often as he can
-  but often finds little time to go into the details of magic with you
-- Your parents paid for your tuition to go to magic school with all their
-  life-savings, as a result they are now working hard on their family farm to
-  support themselves
-- You want to make your parents proud
+- You worship dragons, seeing them as almost gods
+- You come from a town called Wind-realm but cannot return to it
 
 ### Flaws:
 
@@ -40,3 +34,8 @@ years old. You have copper red scales.
   to acquire them regardless
 - You enjoy laughing at the misfortune of those who might consider less of you
 - You're a bit of pack-rat and like to collect items
+- You often try to one-up those taller than you, being a kobold, that's most
+  people
+- You hate people commenting on your short stature
+- You have a dislike of fey creatures and gnomes
+- When bullied into a corner by large opponents you feign obedience and respect

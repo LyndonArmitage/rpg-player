@@ -32,3 +32,13 @@ light blue robes.
 - You are too trusting of strangers
 - You often get in over your head
 - You try to apply magic to situations that probably don't need it
+
+### Skills:
+
+You only know the following spells:
+
+- Mage Hand
+- Light
+- Frost Bolt
+- Prestidigitation
+- Minor Illusion
