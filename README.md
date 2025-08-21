@@ -136,3 +136,18 @@ control how the agent responds. You may want to exaggerate characteristics
 somewhat in order for them to be more apparent, likewise, you'll want to
 indicate how they should speak and request that they limit their output to a
 few sentences at most.
+
+#### AudioTranscriber
+
+The `AudioTranscriber` base class defines a standard interface for transcribing
+audio files (normally WAV files) and exposes both synchronous and asynchronous
+methods for retrieving transcribed text.
+
+Two built-in implementations are provided:
+
+The `OpenAIAudioTranscriber` uses the OpenAI Whisper API to transcribe audio
+files. It supports both single-shot and streamed (async handler) transcription,
+depending on the Whisper model specified. The constructor allows configuring
+the model, language, and additional arguments for the underlying API. When
+using the default "whisper-1" model, only the synchronous API is available.
+Other models may allow streamed outputs delivered via a callback handler.
