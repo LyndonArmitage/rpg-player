@@ -24,7 +24,16 @@ uv sync --all-groups
 You can then run this project with:
 
 ```sh
-uv run python main.py
+uv run python app.py
+```
+
+Or use textual:
+
+```sh
+uv run textual run app.py
+# add --dev to allow you to run with debugging like so:
+uv run textual console
+uv run textual run --dev app.py
 ```
 
 A `requirements.txt` is automatically generated with:
