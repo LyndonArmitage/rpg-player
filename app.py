@@ -1,18 +1,19 @@
 import asyncio
 import logging
-from logging.handlers import RotatingFileHandler
 import os
+import threading
+from logging.handlers import RotatingFileHandler
 from random import Random
 from typing import List, Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI
-from textual import on
+from textual import on, work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll
 from textual.logging import TextualHandler
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Markdown, Rule
+from textual.widgets import Button, Footer, Header, Label, Markdown, Rule
 
 from agent import Agent, OpenAIAgent
 from chat_message import ChatMessage
@@ -40,11 +41,13 @@ class Standby(Screen):
         self.state_machine: StateMachine = state_machine
         self.agent_names = state_machine.agent_names
         self.random: Random = Random()
+        self._disable_bindings = threading.Event()
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield VerticalScroll(id="messages")
         yield Rule(line_style="thick")
+        yield Label("Nothing has happened yet...", id="status")
         with Horizontal(id="buttons"):
             yield Button("Narrate", id="narrate")
             for i, agent_name in enumerate(self.agent_names):
@@ -74,15 +77,24 @@ class Standby(Screen):
         self.action_random_not_last_respond()
 
     def action_agent_1_respond(self):
+        if self._disable_bindings.is_set():
+            return
         self.action_agent_respond(0)
 
     def action_agent_2_respond(self):
+        if self._disable_bindings.is_set():
+            return
         self.action_agent_respond(1)
 
     def action_agent_3_respond(self):
+        if self._disable_bindings.is_set():
+            return
         self.action_agent_respond(2)
 
     def action_enter_narrate(self) -> None:
+        if self._disable_bindings.is_set():
+            return
+
         def on_narrate_done(result: str):
             if result:
                 result = result.strip()
@@ -96,20 +108,42 @@ class Standby(Screen):
         self.app.push_screen(NarrationScreen(title="Narrate"), on_narrate_done)
 
     def action_agent_respond(self, index: int) -> None:
-        self.agent_respond(index)
+        self.agent_respond_async(index)
 
-    def agent_respond(self, number: int):
-        # TODO: should probably use self.run_worker() for actual running code
-        msg = self.state_machine.agent_respond(number)
+    @work(exclusive=True, group="agent", exit_on_error=False)
+    async def agent_respond_async(self, number: int):
+        name = self.agent_names[number]
+        self._disable_responses()
+        self._update_label(f"{name} is thinking...")
+
+        try:
+            msg = await asyncio.to_thread(self.state_machine.agent_respond, number)
+        except Exception as e:
+            self._update_label(f"{name} failed to respond: {e}")
+            self._enable_responses()
+            return
+
         text = f"**{msg.author}:** {msg.content}"
+        await self.add_message(text)
+        self._update_label(f"{name} is speaking...")
+
+        await asyncio.to_thread(self.state_machine.play_message, msg)
+
+        self._update_label(f"{name} responded.")
+        self._enable_responses()
+
+    def _append_markdown(self, text: str) -> None:
         self.call_after_refresh(lambda: asyncio.create_task(self.add_message(text)))
-        self.state_machine.play_message(msg)
 
     def action_random_respond(self) -> None:
+        if self._disable_bindings.is_set():
+            return
         i = self.random.randint(0, len(self.agent_names) - 1)
         self.action_agent_respond(i)
 
     def action_random_not_last_respond(self) -> None:
+        if self._disable_bindings.is_set():
+            return
         if len(self.agent_names) <= 1:
             return
         if len(self.state_machine.messages) == 0:
@@ -129,6 +163,26 @@ class Standby(Screen):
         await log.mount(md)
         await log.mount(Rule())
         self.call_after_refresh(lambda: log.scroll_end(animate=False))
+
+    def _update_label(self, text: str) -> None:
+        self.query_one("#status").update(text)
+
+    def _disable_responses(self) -> None:
+        self._toggle_responses(True)
+
+    def _enable_responses(self) -> None:
+        self._toggle_responses(False)
+
+    def _toggle_responses(self, disabled: bool) -> None:
+        if disabled:
+            self._disable_bindings.set()
+        else:
+            self._disable_bindings.clear()
+        for btn in self.query("#buttons .agent"):
+            btn.disabled = disabled
+        self.query_one("#buttons #narrate").disabled = disabled
+        self.query_one("#buttons #random").disabled = disabled
+        self.query_one("#buttons #not-last").disabled = disabled
 
 
 class MainApp(App):
