@@ -9,6 +9,7 @@ from typing import List, Optional
 from dotenv import load_dotenv
 from openai import OpenAI
 from textual import on, work
+from textual.events import Resize
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalGroup
 from textual.logging import TextualHandler
@@ -44,6 +45,7 @@ class Standby(Screen):
         self.agent_names = state_machine.agent_names
         self.random: Random = Random()
         self._disable_bindings = threading.Event()
+        self.rendered_messages: list = []
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -80,6 +82,15 @@ class Standby(Screen):
     @on(Button.Pressed, "#buttons #not-last")
     def handle_not_last(self, _: Button.Pressed) -> None:
         self.action_random_not_last_respond()
+
+    @on(Resize)
+    def _reflow_log(self, _: Resize) -> None:
+        # TODO: This might be a bit heavy with hundreds of messages
+        if self.rendered_messages:
+            log: RichLog = self.query_one("#messages", RichLog)
+            log.clear()
+            for msg in self.rendered_messages:
+                log.write(msg, shrink=False)
 
     def action_agent_1_respond(self):
         if self._disable_bindings.is_set():
@@ -170,6 +181,7 @@ class Standby(Screen):
         log: RichLog = self.query_one("#messages", RichLog)
         md = Markdown(text)
         log.write(md, shrink=False)
+        self.rendered_messages.append(md)
 
     def _update_label(self, text: str) -> None:
         self.query_one("#status").update(text)
