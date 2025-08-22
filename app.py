@@ -10,10 +10,10 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from textual import on, work
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, VerticalGroup, VerticalScroll
 from textual.logging import TextualHandler
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Label, Markdown, Rule
+from textual.widgets import Button, Footer, Header, Label, Markdown, Rule, Switch
 
 from agent import Agent, OpenAIAgent
 from chat_message import ChatMessage
@@ -56,6 +56,9 @@ class Standby(Screen):
                 yield btn
             yield Button("Random Respond", id="random")
             yield Button("Not Last Respond", id="not-last")
+            with VerticalGroup():
+                yield Label("Toggle Speaking")
+                yield Switch(id="speak-switch", tooltip="Toggle Speaking", value=True)
         yield Footer()
 
     @on(Button.Pressed, "#buttons #narrate")
@@ -115,19 +118,26 @@ class Standby(Screen):
         name = self.agent_names[number]
         self._disable_responses()
         self._update_label(f"{name} is thinking...")
-
+        self.app.notify(f"{name} is thinking")
         try:
             msg = await asyncio.to_thread(self.state_machine.agent_respond, number)
         except Exception as e:
             self._update_label(f"{name} failed to respond: {e}")
             self._enable_responses()
+            self.app.notify(f"{name} failed to respond", severity="error")
             return
 
         text = f"**{msg.author}:** {msg.content}"
         await self.add_message(text)
-        self._update_label(f"{name} is speaking...")
 
-        await asyncio.to_thread(self.state_machine.play_message, msg)
+        speak_switch: Switch = self.query_one("#speak-switch")
+        should_speak: bool = speak_switch.value
+
+        if should_speak:
+            self._update_label(f"{name} is speaking...")
+            self.app.notify(f"{name} is speaking...")
+
+            await asyncio.to_thread(self.state_machine.play_message, msg)
 
         self._update_label(f"{name} responded.")
         self._enable_responses()
