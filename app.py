@@ -156,10 +156,11 @@ class Standby(Screen):
             return
         if len(self.agent_names) <= 1:
             return
-        if len(self.state_machine.messages) == 0:
+        last_msg: Optional[ChatMessage] = self.state_machine.get_last_message(["DM"])
+        if not last_msg:
             return self.action_random_respond()
-        last_msg: ChatMessage = self.state_machine.messages.last
         if last_msg.author not in self.agent_names:
+            self.app.notify(f"Unknown agent: {last_msg.author}", severity="error")
             return self.action_random_respond()
         bad_index = self.agent_names.index(last_msg.author)
         index = bad_index

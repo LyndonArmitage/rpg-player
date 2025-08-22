@@ -88,6 +88,18 @@ class StateMachine:
     def agent_names(self) -> List[str]:
         return [a.name for a in self.agents]
 
+    def get_last_message(
+        self, exclude_authors: Optional[List[str]] = None
+    ) -> Optional[ChatMessage]:
+        """
+        Return the last chat message, optionally excluding the list of authors.
+        """
+        for msg in reversed(self.messages.messages):
+            if exclude_authors and msg.author in exclude_authors:
+                continue
+            return msg
+        return None
+
     def agent_respond(self, index: int) -> ChatMessage:
         """
         Given an agent index, asks the agent to respond
