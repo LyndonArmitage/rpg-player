@@ -10,10 +10,12 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from textual import on, work
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, VerticalGroup, VerticalScroll
+from textual.containers import Horizontal, VerticalGroup
 from textual.logging import TextualHandler
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Label, Markdown, Rule, Switch
+from textual.widgets import Button, Footer, Header, Label, Rule, Switch, RichLog
+
+from rich.markdown import Markdown
 
 from agent import Agent, OpenAIAgent
 from chat_message import ChatMessage
@@ -45,7 +47,7 @@ class Standby(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield VerticalScroll(id="messages")
+        yield RichLog(id="messages", wrap=True)
         yield Rule(line_style="thick")
         yield Label("Nothing has happened yet...", id="status")
         with Horizontal(id="buttons"):
@@ -104,9 +106,8 @@ class Standby(Screen):
                 message = ChatMessage.narration("DM", result)
                 self.state_machine.add_message(message)
                 msg = f"**DM:** {result}"
-                self.call_after_refresh(
-                    lambda: asyncio.create_task(self.add_message(msg))
-                )
+                self.add_message(msg)
+                self._update_label("DM narrated.")
 
         self.app.push_screen(NarrationScreen(title="Narrate"), on_narrate_done)
 
@@ -128,7 +129,7 @@ class Standby(Screen):
             return
 
         text = f"**{msg.author}:** {msg.content}"
-        await self.add_message(text)
+        self.add_message(text)
 
         speak_switch: Switch = self.query_one("#speak-switch")
         should_speak: bool = speak_switch.value
@@ -141,9 +142,6 @@ class Standby(Screen):
 
         self._update_label(f"{name} responded.")
         self._enable_responses()
-
-    def _append_markdown(self, text: str) -> None:
-        self.call_after_refresh(lambda: asyncio.create_task(self.add_message(text)))
 
     def action_random_respond(self) -> None:
         if self._disable_bindings.is_set():
@@ -168,12 +166,10 @@ class Standby(Screen):
             index = self.random.randint(0, len(self.agent_names) - 1)
         self.action_agent_respond(index)
 
-    async def add_message(self, text: str) -> None:
-        log = self.query_one("#messages", VerticalScroll)
-        md = Markdown(text, classes="msg")
-        await log.mount(md)
-        await log.mount(Rule())
-        self.call_after_refresh(lambda: log.scroll_end(animate=False))
+    def add_message(self, text: str) -> None:
+        log: RichLog = self.query_one("#messages", RichLog)
+        md = Markdown(text)
+        log.write(md, shrink=False)
 
     def _update_label(self, text: str) -> None:
         self.query_one("#status").update(text)
