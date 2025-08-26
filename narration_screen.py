@@ -3,14 +3,16 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 
+from rich.markdown import Markdown
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Label, TextArea
+from textual.widgets import Button, Footer, Header, Label, RichLog, TextArea
 
-from audio_transcriber import AudioTranscriber
 from audio_recorder import AudioRecorder, SoundDeviceRecorder
+from audio_transcriber import AudioTranscriber
+from chat_message import ChatMessages
 
 
 @dataclass
@@ -38,6 +40,9 @@ class NarrationScreen(Screen):
         color: $text 50%;
         padding: 0 1;
     }
+    RichLog {
+        height: 0.5fr;
+    }
     TextArea {
         height: 1fr;
         border: tall $accent 10%;
@@ -45,7 +50,11 @@ class NarrationScreen(Screen):
     """
 
     def __init__(
-        self, *, title: str = "Narration", transcriber: AudioTranscriber
+        self,
+        *,
+        title: str = "Narration",
+        transcriber: AudioTranscriber,
+        messages: ChatMessages,
     ) -> None:
         super().__init__()
         self._title = title
@@ -54,6 +63,7 @@ class NarrationScreen(Screen):
         self._chunk_idx = 0
         self.transcriber: AudioTranscriber = transcriber
         self.recorder: AudioRecorder = SoundDeviceRecorder()
+        self.messages: ChatMessages = messages
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -63,6 +73,7 @@ class NarrationScreen(Screen):
                 yield Button("Accept", id="btn-accept", variant="success")
                 yield Button("Cancel", id="btn-cancel", variant="warning")
                 yield Button("Clear", id="btn-clear", classes="end")
+            yield RichLog(id="messages")
             yield Label("Ready.", id="status")
             yield TextArea(
                 id="editor", language="markdown", tooltip="Narration text (editable)"
@@ -71,7 +82,17 @@ class NarrationScreen(Screen):
 
     def on_mount(self) -> None:
         self.title = self._title
-        editor = self.query_one(TextArea)
+
+        log: RichLog = self.query_one("#messages", RichLog)
+        recent_msg_count = 10
+        log.write(f"{recent_msg_count} recent messages: ")
+        last_n_messages = self.messages.messages[-recent_msg_count:]
+        for message in last_n_messages:
+            text = f"**{message.author}**: {message.content}"
+            md = Markdown(text)
+            log.write(md)
+
+        editor: TextArea = self.query_one(TextArea)
         # Don't set any initial text even if self._initial_text is set
         editor.text = ""
         editor.focus()

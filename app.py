@@ -66,6 +66,12 @@ class Standby(Screen):
                 yield Switch(id="speak-switch", tooltip="Toggle Speaking", value=True)
         yield Footer()
 
+    def on_mount(self) -> None:
+        # Make sure any pre-made messages are visible
+        for msg in self.state_machine.messages:
+            text = f"**{msg.author}:** {msg.content}"
+            self.add_message(text)
+
     @on(Button.Pressed, "#buttons #narrate")
     def handle_narrate(self, _: Button.Pressed):
         self.action_enter_narrate()
@@ -121,7 +127,11 @@ class Standby(Screen):
                 self.add_message(msg)
                 self._update_label("DM narrated.")
 
-        narrate_screen = NarrationScreen(title="Narrate", transcriber=self.transcriber)
+        narrate_screen = NarrationScreen(
+            title="Narrate",
+            transcriber=self.transcriber,
+            messages=self.state_machine.messages,
+        )
         self.app.push_screen(narrate_screen, on_narrate_done)
 
     def action_agent_respond(self, index: int) -> None:
@@ -260,7 +270,7 @@ class MainApp(App):
         # Add a message with the player names so everyone knows who is present
         intro_players_msg = ChatMessage.narration(
             "DM",
-            "The following player characters are present:\n"
+            "The following player characters are present:\n- "
             + "\n- ".join(self.state_machine.agent_names),
         )
         self.state_machine.add_message(intro_players_msg)
