@@ -79,7 +79,7 @@ class StateMachine:
         if self.messages_file:
             # Append to messages file
             with self.messages_file.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(message.as_dict()))
+                f.write(json.dumps(message.to_dict()))
                 f.write("\n")
         if self.message_listener:
             self.message_listener(message)

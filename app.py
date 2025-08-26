@@ -3,6 +3,7 @@ import logging
 import os
 import threading
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from random import Random
 from typing import List, Optional
 
@@ -265,15 +266,24 @@ class MainApp(App):
         other_actor.set_speaker_id_for("Vex", 14)
         other_actor.set_speaker_id_for("Bleb", 20)
         voice_actors.register_actor(other_actor)
-        self.state_machine: StateMachine = StateMachine(agents, voice_actors)
 
-        # Add a message with the player names so everyone knows who is present
-        intro_players_msg = ChatMessage.narration(
-            "DM",
-            "The following player characters are present:\n- "
-            + "\n- ".join(self.state_machine.agent_names),
+        messages_path: Optional[Path] = None
+        messages_path = os.getenv("MESSAGES_PATH")
+        if messages_path:
+            messages_path = Path(messages_path)
+
+        self.state_machine: StateMachine = StateMachine(
+            agents, voice_actors, messages_file=messages_path
         )
-        self.state_machine.add_message(intro_players_msg)
+
+        if len(self.state_machine.messages) <= 0:
+            # Add a message with the player names so everyone knows who is present
+            intro_players_msg = ChatMessage.narration(
+                "DM",
+                "The following player characters are present:\n- "
+                + "\n- ".join(self.state_machine.agent_names),
+            )
+            self.state_machine.add_message(intro_players_msg)
 
         transcriber: AudioTranscriber = OpenAIAudioTranscriber(openai)
         standby = Standby(self.state_machine, transcriber)
