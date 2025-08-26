@@ -58,6 +58,26 @@ class VoiceActor(ABC):
         """
         raise NotImplementedError
 
+    @property
+    @abstractmethod
+    def can_speak_out_loud(self) -> bool:
+        """
+        True if this voice actor supports speaking out loud
+        """
+        return False
+
+    @abstractmethod
+    def speak_message_out_load(self, message: ChatMessage) -> None:
+        """
+        Speak the given message out loud. This will not save the message to a
+        file but instead speak the message through the audio output device as
+        soon as possible.
+
+        Not all voice actors will be able to do this so you should check if it
+        is possible first.
+        """
+        raise NotImplementedError
+
 
 class PiperVoiceActor(VoiceActor):
     """
@@ -154,6 +174,15 @@ class PiperVoiceActor(VoiceActor):
                     wf.writeframes(chunk.audio_int16_bytes)
         return out_path
 
+    @property
+    @override
+    def can_speak_out_loud(self) -> bool:
+        return False
+
+    @override
+    def speak_message_out_load(self, message: ChatMessage) -> None:
+        raise NotImplementedError
+
 
 class EchoVoiceActor(VoiceActor):
     """
@@ -185,6 +214,15 @@ class EchoVoiceActor(VoiceActor):
             f.write(message.content)
             path = Path(f.name)
         return path
+
+    @property
+    @override
+    def can_speak_out_loud(self) -> bool:
+        return False
+
+    @override
+    def speak_message_out_load(self, message: ChatMessage) -> None:
+        raise NotImplementedError
 
 
 class OpenAIVoiceActor(VoiceActor):
@@ -274,6 +312,15 @@ class OpenAIVoiceActor(VoiceActor):
                 pass
             raise
 
+    @property
+    @override
+    def can_speak_out_loud(self) -> bool:
+        return False
+
+    @override
+    def speak_message_out_load(self, message: ChatMessage) -> None:
+        raise NotImplementedError
+
 
 class VoiceActorManager:
     """
@@ -312,20 +359,32 @@ class VoiceActorManager:
         if actor in self.actors:
             self.actors.remove(actor)
 
-    def process_message(self, message: ChatMessage) -> List[Path]:
+    def process_message(self, message: ChatMessage) -> (bool, List[Path]):
         """
         Given a message, process it, passing it to VoiceActor instances if
         needed.
 
-        Will return a list of file paths for the voiced lines. This should
-        normally be a single file, but multiple files may be written, either by
-        differnt voice actors or the same voice actor.
+        Will return a tuple of a boolean and list of file paths for the
+        voiced lines. The first boolean from the tuple indicates if any Voice
+        Actor spoke (be it writing to a file or out loud).
+
+        The list of files should normally be a single file, but multiple files
+        may be written, either by differnt voice actors or the same voice actor.
+
+        If voice actors can speak out loud, they will not return a file and
+        will instead block this function while they speak.
         """
         log.debug(f"Processing message: {message.msg_id}")
         paths: List[Path] = []
+        spoke: bool = False
         for actor in self.actors:
             if actor.should_speak_message(message):
-                path = actor.speak_message(message, self._tmp_path)
-                if path:
-                    paths.append(path)
-        return paths
+                if actor.can_speak_out_loud:
+                    actor.speak_message_out_load(message)
+                    spoke = True
+                else:
+                    path = actor.speak_message(message, self._tmp_path)
+                    if path:
+                        paths.append(path)
+                        spoke = True
+        return (spoke, paths)

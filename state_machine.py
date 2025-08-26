@@ -116,13 +116,13 @@ class StateMachine:
         return response
 
     def play_message(self, message: ChatMessage):
-        voice_paths: List[Path] = self.voice_actors.process_message(message)
+        spoke, voice_paths = self.voice_actors.process_message(message)
         if voice_paths:
             voice_count: int = len(voice_paths)
             if voice_count > 1:
                 log.warning(f"Multiple voice files, will play first: {voice_paths}")
             self.play_audio(voice_paths[0])
-        else:
+        elif not spoke:
             log.warning(f"No actor for message from {message.author} {message.msg_id}")
 
     def play_audio(self, path: Path):
