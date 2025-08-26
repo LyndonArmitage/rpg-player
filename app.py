@@ -8,17 +8,17 @@ from typing import List, Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from rich.markdown import Markdown
 from textual import on, work
-from textual.events import Resize
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalGroup
+from textual.events import Resize
 from textual.logging import TextualHandler
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Label, Rule, Switch, RichLog
-
-from rich.markdown import Markdown
+from textual.widgets import Button, Footer, Header, Label, RichLog, Rule, Switch
 
 from agent import Agent, OpenAIAgent
+from audio_transcriber import AudioTranscriber, OpenAIAudioTranscriber
 from chat_message import ChatMessage
 from narration_screen import NarrationScreen
 from state_machine import StateMachine
@@ -39,13 +39,14 @@ class Standby(Screen):
         ("r", "random_not_last_respond", "Not Last Respond"),
     ]
 
-    def __init__(self, state_machine: StateMachine):
+    def __init__(self, state_machine: StateMachine, transcriber: AudioTranscriber):
         super().__init__()
         self.state_machine: StateMachine = state_machine
         self.agent_names = state_machine.agent_names
         self.random: Random = Random()
         self._disable_bindings = threading.Event()
         self.rendered_messages: list = []
+        self.transcriber: AudioTranscriber = transcriber
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -120,7 +121,8 @@ class Standby(Screen):
                 self.add_message(msg)
                 self._update_label("DM narrated.")
 
-        self.app.push_screen(NarrationScreen(title="Narrate"), on_narrate_done)
+        narrate_screen = NarrationScreen(title="Narrate", transcriber=self.transcriber)
+        self.app.push_screen(narrate_screen, on_narrate_done)
 
     def action_agent_respond(self, index: int) -> None:
         self.agent_respond_async(index)
@@ -263,7 +265,8 @@ class MainApp(App):
         )
         self.state_machine.add_message(intro_players_msg)
 
-        standby = Standby(self.state_machine)
+        transcriber: AudioTranscriber = OpenAIAudioTranscriber(openai)
+        standby = Standby(self.state_machine, transcriber)
         self.install_screen(standby, "standby")
         self.push_screen("standby")
 

@@ -3,12 +3,14 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 
-
 from textual import on
-from textual.screen import Screen
-from textual.widgets import Button, Label, TextArea, Footer, Header
-from textual.containers import Horizontal, Vertical
 from textual.app import ComposeResult
+from textual.containers import Horizontal, Vertical
+from textual.screen import Screen
+from textual.widgets import Button, Footer, Header, Label, TextArea
+
+from audio_transcriber import AudioTranscriber
+from audio_recorder import AudioRecorder, SoundDeviceRecorder
 
 
 @dataclass
@@ -42,12 +44,16 @@ class NarrationScreen(Screen):
     }
     """
 
-    def __init__(self, *, title: str = "Narration") -> None:
+    def __init__(
+        self, *, title: str = "Narration", transcriber: AudioTranscriber
+    ) -> None:
         super().__init__()
         self._title = title
         self._is_recording = False
         self._record_task = None
         self._chunk_idx = 0
+        self.transcriber: AudioTranscriber = transcriber
+        self.recorder: AudioRecorder = SoundDeviceRecorder()
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
