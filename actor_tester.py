@@ -116,8 +116,11 @@ class VoiceActorScreen(Screen):
         message = ChatMessage.speech(result, text)
         label: Label = self.query_one("#test_label")
         label.update(f"Played: {name} with speaker id {result}")
-        audio_path = actor.speak_message(message, self.temp_folder_path)
-        self.audio_player.play_file(audio_path)
+        if actor.can_speak_out_loud:
+            actor.speak_message_out_load(message)
+        else:
+            audio_path = actor.speak_message(message, self.temp_folder_path)
+            self.audio_player.play_file(audio_path)
 
 
 class VoiceActorTestApp(App):

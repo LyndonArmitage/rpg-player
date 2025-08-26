@@ -1,11 +1,14 @@
 import logging
 import os
+import queue
 import tempfile
+import threading
 import wave
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Set, Union, override
 
+import sounddevice as sd
 from openai import OpenAI
 from piper.voice import PiperVoice, SynthesisConfig
 
@@ -164,24 +167,113 @@ class PiperVoiceActor(VoiceActor):
             wf.setframerate(self.voice.config.sample_rate)
 
             if text:
-                config = self.syn_config
-                author_casefold = message.author.casefold()
-                if author_casefold in self.speaker_map:
-                    config = SynthesisConfig(
-                        speaker_id=self.speaker_map[author_casefold]
-                    )
+                config = self._get_config_for_author(message.author)
                 for chunk in self.voice.synthesize(text, syn_config=config):
                     wf.writeframes(chunk.audio_int16_bytes)
         return out_path
 
+    def _get_config_for_author(self, author: str) -> SynthesisConfig:
+        config = self.syn_config
+        author_casefold = author.casefold()
+        if author_casefold in self.speaker_map:
+            config = SynthesisConfig(speaker_id=self.speaker_map[author_casefold])
+        return config
+
     @property
     @override
     def can_speak_out_loud(self) -> bool:
-        return False
+        return True
 
     @override
     def speak_message_out_load(self, message: ChatMessage) -> None:
-        raise NotImplementedError
+        text = (message.content or "").strip()
+        if not text:
+            return
+        config = self._get_config_for_author(message.author)
+        gen = self.voice.synthesize(text, syn_config=config)
+        first_chunk = next(gen)
+        assert first_chunk.sample_width == 2, "Expected 16-bit PCM"
+        sample_rate = first_chunk.sample_rate
+        channels = first_chunk.sample_channels or 1
+        bytes_per_frame = channels * first_chunk.sample_width
+
+        # Use a queue to fill with audio bytes
+        fifo = queue.Queue(maxsize=32)
+        playback_done = threading.Event()
+
+        def producer():
+            # total = 0
+            b = first_chunk.audio_int16_bytes
+            fifo.put(b)
+            # total += len(b)
+            buffered = 1
+            for chunk in gen:
+                b = chunk.audio_int16_bytes
+                fifo.put(b)
+                # total += len(b)
+                buffered += 1
+            fifo.put(None)
+
+        # Start piper producing audio into the FIFO
+        prod_thread = threading.Thread(target=producer, daemon=True)
+        prod_thread.start()
+
+        # This is the buffer that will be drained while speaking
+        buffer = bytearray()
+        saw_eos_during_prebuffer = False
+        # Prebuffer some lines before playback begins
+        prebuffer_chunk_count = 2
+        for _ in range(prebuffer_chunk_count):
+            item = fifo.get()
+            if item is None:
+                # Already finished the speaking
+                fifo.put(None)
+                saw_eos_during_prebuffer = True
+                break
+            buffer.extend(item)
+
+        if saw_eos_during_prebuffer and not buffer:
+            # Nothing to play
+            prod_thread.join()
+            return
+
+        # This call back will fill our device buffer from the byte buffer
+        def callback(outdata, frames, time, status):
+            nonlocal buffer
+            needed = frames * bytes_per_frame
+            while len(buffer) < needed:
+                item = fifo.get(timeout=2.0)
+                if item is None:
+                    # End of the stream of audio
+                    n = min(len(buffer), needed)
+                    if n:
+                        outdata[:n] = buffer[:n]
+                    if n < needed:
+                        # Need to pad the outdata
+                        outdata[n:needed] = b"\x00" * (needed - n)
+                    buffer.clear()
+                    playback_done.set()
+                    raise sd.CallbackStop  # Tells the sounddevice we are done
+                buffer.extend(item)
+
+            # Copy data needed to PortAudio
+            outdata[:needed] = buffer[:needed]
+            del buffer[:needed]
+
+        def finished_callback():
+            playback_done.set()
+
+        with sd.RawOutputStream(
+            samplerate=sample_rate,
+            channels=channels,
+            dtype="int16",
+            latency=None,
+            blocksize=1024,
+            callback=callback,
+            finished_callback=finished_callback,
+        ):
+            prod_thread.join()
+            playback_done.wait(timeout=30)
 
 
 class EchoVoiceActor(VoiceActor):
