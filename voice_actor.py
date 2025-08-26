@@ -294,8 +294,8 @@ class PiperVoiceActor(VoiceActor):
             samplerate=sample_rate,
             channels=channels,
             dtype="int16",
-            latency=None,
-            blocksize=1024,
+            latency="low",
+            blocksize=512,
             callback=callback,
             finished_callback=finished_callback,
         ):
