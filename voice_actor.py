@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Set, Union, override
 
+import onnxruntime as ort
 import sounddevice as sd
 from openai import OpenAI
 from piper.voice import PiperVoice, SynthesisConfig
@@ -114,7 +115,12 @@ class PiperVoiceActor(VoiceActor):
         speaker_id: Optional[int] = None,
     ):
         self.names: Set[str] = _parse_names(names)
-        self.voice: PiperVoice = PiperVoice.load(str(model_path))
+        self.supports_cuda: bool = (
+            "CUDAExecutionProvider" in ort.get_available_providers()
+        )
+        self.voice: PiperVoice = PiperVoice.load(
+            str(model_path), use_cuda=self.supports_cuda
+        )
         self.syn_config = SynthesisConfig(speaker_id=speaker_id)
         self.speaker_map: Dict[str, int] = dict()
         self.number_of_speakers: int = self.voice.config.num_speakers

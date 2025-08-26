@@ -2,6 +2,7 @@ import tempfile
 import time
 from pathlib import Path
 
+import onnxruntime as ort
 from dotenv import load_dotenv
 
 from audio_player import AudioPlayer, SoundDevicePlayer
@@ -10,6 +11,7 @@ from voice_actor import PiperVoiceActor, VoiceActor
 
 
 def main():
+    print(f"ort providers: {ort.get_available_providers()}")
     model_path = "piper-models/en_US-lessac-medium.onnx"
     actor: VoiceActor = PiperVoiceActor("test", model_path)
     text = "This is a test audio file."
