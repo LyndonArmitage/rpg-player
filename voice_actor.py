@@ -237,28 +237,55 @@ class PiperVoiceActor(VoiceActor):
             prod_thread.join()
             return
 
+        tail_silence_secs = 0.10
+        tail_bytes_remaining = 0
+        eos_seen = False
+
         # This call back will fill our device buffer from the byte buffer
         def callback(outdata, frames, time, status):
-            nonlocal buffer
+            nonlocal buffer, eos_seen, tail_bytes_remaining
             needed = frames * bytes_per_frame
-            while len(buffer) < needed:
-                item = fifo.get(timeout=2.0)
+            while len(buffer) < needed and not eos_seen:
+                try:
+                    item = fifo.get(timeout=2.0)
+                except queue.Empty:
+                    item = None
+                    # treat as EOS if producer died
+
                 if item is None:
                     # End of the stream of audio
-                    n = min(len(buffer), needed)
-                    if n:
-                        outdata[:n] = buffer[:n]
-                    if n < needed:
-                        # Need to pad the outdata
-                        outdata[n:needed] = b"\x00" * (needed - n)
-                    buffer.clear()
-                    playback_done.set()
-                    raise sd.CallbackStop  # Tells the sounddevice we are done
+                    eos_seen = True
+                    tail_bytes_remaining = (
+                        int(tail_silence_secs * sample_rate) * bytes_per_frame
+                    )
+                    break
                 buffer.extend(item)
 
-            # Copy data needed to PortAudio
-            outdata[:needed] = buffer[:needed]
-            del buffer[:needed]
+            # Fill outdata from buffer first
+            n = min(len(buffer), needed)
+            if n:
+                outdata[:n] = buffer[:n]
+                del buffer[:n]
+
+            # If we still owe bytes for this callback, use silence
+
+            remaining = needed - n
+            if remaining > 0:
+                if eos_seen and tail_bytes_remaining > 0:
+                    z = min(remaining, tail_bytes_remaining)
+                    outdata[n : n + z] = b"\x00" * z
+                    tail_bytes_remaining -= z
+                    n += z
+                    remaining -= z
+
+                # If we still have a shortfall (shouldn't happen), pad zeroes
+                if remaining > 0:
+                    outdata[n:needed] = b"\x00" * remaining
+
+            # Stop only after we emit the full tail of silence
+            if eos_seen and tail_bytes_remaining > 0 and len(buffer) == 0:
+                playback_done.set()
+                raise sd.CallbackStop
 
         def finished_callback():
             playback_done.set()
@@ -273,7 +300,7 @@ class PiperVoiceActor(VoiceActor):
             finished_callback=finished_callback,
         ):
             prod_thread.join()
-            playback_done.wait(timeout=30)
+            playback_done.wait()
 
 
 class EchoVoiceActor(VoiceActor):
