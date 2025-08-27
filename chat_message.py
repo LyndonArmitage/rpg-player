@@ -10,12 +10,18 @@ class MessageType(enum.Enum):
     """
     A type of message.
 
-    There are 3 main types, only 2 of which will likely be used often.
+    There are 4 main types:
+
+        - SPEECH - This is speech from an agent
+        - SYSTEM - This is reserved for system prompts
+        - NARRATION - This is narration from the GM/DM
+        - SUMMARY - This is summaries from the system
     """
 
     SPEECH = "speech"
     SYSTEM = "system"
     NARRATION = "narration"
+    SUMMARY = "summary"
 
 
 @dataclass
@@ -38,6 +44,10 @@ class ChatMessage:
     @classmethod
     def system(cls, author: str, content: str) -> "ChatMessage":
         return cls(str(uuid.uuid4()), author, MessageType.SYSTEM, content)
+
+    @classmethod
+    def summary(cls, author: str, content: str) -> "ChatMessage":
+        return cls(str(uuid.uuid4()), author, MessageType.SUMMARY, content)
 
     @staticmethod
     def from_dict(d: dict) -> "ChatMessage":
@@ -72,6 +82,10 @@ class ChatMessages:
                 role = "user"
             case MessageType.SYSTEM:
                 role = "developer"
+            case MessageType.SUMMARY:
+                role = "assistant"
+                if msg_author == "DM" or msg_author == "GM":
+                    role = "user"
         return {"role": role, "content": f"{msg_author}: {message.content}"}
 
     @staticmethod
@@ -117,6 +131,13 @@ class ChatMessages:
     def extend(self, messages: Iterable[ChatMessage]):
         for message in messages:
             self.append(message)
+
+    def filter_type(self, msg_type: MessageType) -> List[ChatMessage]:
+        msgs: List[ChatMessage] = []
+        for message in self.messages:
+            if message.type == msg_type:
+                msgs.append(message)
+        return msgs
 
     @property
     def as_openai(self) -> List[dict]:
