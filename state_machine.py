@@ -19,15 +19,11 @@ class StateMachine:
     @staticmethod
     def _load_messages_file(file: Path, container: ChatMessages):
         log.info(f"Loading messages file: {file}")
+        loaded_msgs: List[ChatMessage] = ChatMessages.load_messages_from_file(file)
         # Load messages file
-        count = 0
-        with open(file, "r") as f:
-            for line in f:
-                entry = json.loads(line)
-                message = ChatMessage.from_dict(entry)
-                container.append(message)
-                count += 1
+        count = len(loaded_msgs)
         log.info(f"Read {count} messages")
+        container.extend(loaded_msgs)
 
     @staticmethod
     def _create_empty_messages_file(file: Path):

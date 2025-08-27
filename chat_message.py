@@ -1,6 +1,8 @@
 import enum
+import json
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Iterable, Iterator, List, Optional
 
 
@@ -71,6 +73,25 @@ class ChatMessages:
             case MessageType.SYSTEM:
                 role = "developer"
         return {"role": role, "content": f"{msg_author}: {message.content}"}
+
+    @staticmethod
+    def load_messages_from_file(file: Path) -> List[ChatMessage]:
+        """
+        Load the given messages from a file.
+
+        Messages should be encoded as single JSON objects per line (AKA JSONL
+        or nd-json)
+        """
+        if not file.exists():
+            return []
+        loaded_messages: List[ChatMessage] = []
+        with open(file, "r") as f:
+            for line in f:
+                trimmed = line.strip()
+                entry = json.loads(trimmed)
+                message: ChatMessage = ChatMessage.from_dict(entry)
+                loaded_messages.append(message)
+        return loaded_messages
 
     def __init__(self):
         self.messages: List[ChatMessage] = []
