@@ -30,12 +30,14 @@ It is your job to reply with a summary of what happened in each session.
 
 - Make sure to mention that this is a summary of the last session
 - Keep your summary concise
+- Try to keep events in order
 - Use bullet point lists where appropriate
 - Keep track of NPCs encountered
 - Keep track of the actions players took and their outcomes
 - Keep track of any items aquired, used or lost
 - Keep track of story and quest threads and their progression
 - Do not embelish or fabricate events that did not happen
+- Only provide the summary, do not offer to provide any other output
 
 The transcripts will be in the format of:
 
@@ -59,10 +61,12 @@ It is your job to reply with a running summary of what has happened overall.
 - Make sure to mention that this is what has happened so far in the adventure
 - Keep your summary concise, a few short paragraphs should be enough
 - Be descriptive
+- Keep events in order
 - Focus on the overall quest as well as recent events
 - Do not embelish or fabricate events that did not happen
 
 The session summaries will be split by `---` followed by a new line.
+
 """
 
 
@@ -127,12 +131,11 @@ def main():
         "## Last Session Summary\n\n"
         f"{summaries.last_session}"
     )
+    print(combined_summary)
     summary_message: ChatMessage = ChatMessage.summary("DM", combined_summary)
     with output_path.open("w", encoding="utf-8") as f:
         f.write(json.dumps(summary_message.to_dict()))
         f.write("\n")
-
-    print(combined_summary)
 
 
 def summarise_session(client: OpenAI, messages: ChatMessages) -> str:
