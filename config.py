@@ -1,12 +1,29 @@
 import json
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Union
+
+from openai import OpenAI
+
+from agent import Agent, OpenAIAgent
+from voice_actor import PiperVoiceActor, VoiceActor
 
 
 @dataclass
 class APIKeys:
     openai: Optional[str] = None
+
+    def get_openai_client(self) -> OpenAI:
+        """
+        Get an OpenAI client from the configuration or environment
+        """
+        if self.openai:
+            return OpenAI(api_key=self.openai)
+        else:
+            log = logging.getLogger(__name__)
+            log.warning("Using OpenAI Key from environment")
+            return OpenAI()
 
 
 @dataclass
@@ -19,15 +36,57 @@ class PromptConfig:
 class AgentConfig:
     name: str
     prompt_path: Path
-    model: str
-    # TODO: Add deeper AI config
+    type: str
+    args: dict
+
+    def create_agent(self, prompt_config: PromptConfig, **kwargs) -> Agent:
+        match self.type.casefold():
+            case "openai":
+                openai: Optional[OpenAI] = kwargs.get("openai")
+                if not openai:
+                    raise ValueError("Missing 'openai' parameter")
+                if not isinstance(openai, OpenAI):
+                    raise ValueError("'openai' is not an OpenAI object")
+                return self.create_openai(openai, prompt_config, **kwargs)
+        raise NotImplementedError(f"No agent implemented for type {self.type}")
+
+    def create_openai(
+        self, openai_client: OpenAI, prompt_config: PromptConfig, **kwargs
+    ) -> OpenAIAgent:
+        args: dict = {**self.args, **kwargs}
+        model: str = args.get("model", "gpt-5-mini")
+        return OpenAIAgent.load_prompt(
+            self.name,
+            self.prompt_path,
+            openai_client,
+            model=model,
+            prefix_path=prompt_config.prefix_path,
+            suffix_path=prompt_config.suffix_path,
+        )
 
 
 @dataclass
 class VoiceActorConfig:
     type: str
-    speakers: Dict[str, int]
+    speakers: List[str]
     args: dict
+
+    def create_actor(self) -> VoiceActor:
+        match self.type.casefold():
+            case "piper":
+                return self._create_piper_actor()
+        raise NotImplementedError(f"Not implemented for type: {self.type}")
+
+    def _create_piper_actor(self) -> PiperVoiceActor:
+        args: dict = self.args
+        model_path: str = args.get("model_path")
+        if not model_path:
+            raise ValueError("Missing 'model_path' from args")
+        actor = PiperVoiceActor(self.speakers, Path(model_path))
+        speaker_ids: Dict[str, int] = args.get("speaker_ids", {})
+        for name, speaker_id in speaker_ids.items():
+            actor.set_speaker_id_for(name, speaker_id)
+        return actor
 
 
 @dataclass
@@ -66,13 +125,14 @@ class Config:
             return AgentConfig(
                 name=d["name"],
                 prompt_path=Path(d["prompt_path"]),
-                model=d["model"],
+                type=d["type"],
+                args=dict(d.get("args", {})),
             )
 
         def parse_voice_actor(d: dict) -> VoiceActorConfig:
             return VoiceActorConfig(
                 type=d["type"],
-                speakers=dict(d.get("speakers", {})),
+                speakers=list(d.get("speakers", [])),
                 args=dict(d.get("args", {})),
             )
 
@@ -97,7 +157,7 @@ class Config:
             path = Path(str)
         if not path.exists():
             raise ValueError(f"path does not exist: {path}")
-        if path.is_file():
+        if not path.is_file():
             raise ValueError(f"path is not a file: {path}")
         extension: str = path.suffix.casefold()
         match extension:

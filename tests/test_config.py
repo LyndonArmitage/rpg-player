@@ -2,21 +2,33 @@ from pathlib import Path
 
 from config import AgentConfig, APIKeys, Config, PromptConfig, VoiceActorConfig
 
+TEST_DATA: dict = {
+    "prompt_config": {
+        "prefix_path": "foo/prefix.txt",
+        "suffix_path": "foo/suffix.txt",
+    },
+    "messages_path": "foo/messages.json",
+    "api_keys": {"openai": "testkey"},
+    "agents": [
+        {
+            "name": "Foo",
+            "prompt_path": "foo/prompt.txt",
+            "type": "openai",
+            "args": {"model": "gpt-5"},
+        }
+    ],
+    "voice_actors": [
+        {
+            "type": "piper",
+            "speakers": ["Foo", "Bar"],
+            "args": {"speaker_ids": {"Foo": 1, "Bar": 2}},
+        }
+    ],
+}
+
 
 def test_from_dict():
-    data = {
-        "prompt_config": {
-            "prefix_path": "foo/prefix.txt",
-            "suffix_path": "foo/suffix.txt",
-        },
-        "messages_path": "foo/messages.json",
-        "api_keys": {"openai": "testkey"},
-        "agents": [{"name": "gpt", "prompt_path": "foo/prompt.txt", "model": "gpt-4"}],
-        "voice_actors": [
-            {"type": "tortoise", "speakers": {"a": 1}, "args": {"foo": "bar"}}
-        ],
-    }
-    config = Config.from_dict(data)
+    config = Config.from_dict(TEST_DATA)
 
     assert isinstance(config, Config)
     assert isinstance(config.prompt_config, PromptConfig)
@@ -29,13 +41,14 @@ def test_from_dict():
     assert len(config.agents) == 1
     agent = config.agents[0]
     assert isinstance(agent, AgentConfig)
-    assert agent.name == "gpt"
+    assert agent.name == "Foo"
     assert agent.prompt_path == Path("foo/prompt.txt")
-    assert agent.model == "gpt-4"
+    assert agent.type == "openai"
+    assert agent.args == {"model": "gpt-5"}
 
     assert len(config.voice_actors) == 1
     va = config.voice_actors[0]
     assert isinstance(va, VoiceActorConfig)
-    assert va.type == "tortoise"
-    assert va.speakers == {"a": 1}
-    assert va.args == {"foo": "bar"}
+    assert va.type == "piper"
+    assert va.speakers == ["Foo", "Bar"]
+    assert va.args == {"speaker_ids": {"Foo": 1, "Bar": 2}}
