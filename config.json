@@ -1,0 +1,54 @@
+{
+  "prompt_config": {
+    "prefix_path": "prompts/prefix.md",
+    "suffix_path": "prompts/suffix.md"
+  },
+  "messages_path": "testing.log",
+  "agents": [
+    {
+      "name": "Vex",
+      "prompt_path": "prompts/vex.md",
+      "type": "openai",
+      "args": {
+        "model": "gpt-5-mini"
+      }
+    },
+    {
+      "name": "Garry",
+      "prompt_path": "prompts/garry.md",
+      "type": "openai",
+      "args": {
+        "model": "gpt-5-mini"
+      }
+    },
+    {
+      "name": "Bleb",
+      "prompt_path": "prompts/bleb.md",
+      "type": "openai",
+      "args": {
+        "model": "gpt-5-mini"
+      }
+    }
+  ],
+  "voice_actors": [
+    {
+      "type": "piper",
+      "speakers": ["Garry"],
+      "args": {
+        "model_path": "piper-models/en_US-lessac-medium.onnx"
+      }
+    },
+    {
+      "type": "piper",
+      "speakers": ["Vex", "Bleb"],
+      "args": {
+        "model_path": "piper-models/en_US-libritts-high.onnx",
+        "speaker_ids": {
+          "Vex": 14,
+          "Bleb": 20
+        }
+      }
+    }
+  ]
+
+}

@@ -18,13 +18,13 @@ from textual.logging import TextualHandler
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Label, RichLog, Rule, Switch
 
-from agent import Agent, OpenAIAgent
+from agent import Agent
 from audio_transcriber import AudioTranscriber, OpenAIAudioTranscriber
 from chat_message import ChatMessage
 from config import Config
 from narration_screen import NarrationScreen
 from state_machine import StateMachine
-from voice_actor import PiperVoiceActor, VoiceActor, VoiceActorManager
+from voice_actor import VoiceActor, VoiceActorManager
 
 
 class Standby(Screen):
@@ -222,30 +222,29 @@ class MainApp(App):
     TITLE = "RPG Party"
 
     def on_ready(self) -> None:
-        logger = logging.getLogger(__name__)
         config_path: Path = Path("config.json")
-        if config_path.exists() and config_path.is_file():
-            logger.info(f"Loading from {config_path}")
-            config: Config = Config.from_path(config_path)
-            agents: List[Agent] = []
-            # TODO: Make this neater
-            openai: OpenAI = _get_openai(config)
-            for agent_conf in config.agents:
-                agent = agent_conf.create_agent(config.prompt_config, openai=openai)
-                agents.append(agent)
+        if not config_path.exists() or not config_path.is_file():
+            raise ValueError(f"No config at {config_path}")
 
-            voice_actors: VoiceActorManager = VoiceActorManager()
-            for actor_config in config.voice_actors:
-                actor: VoiceActor = actor_config.create_actor()
-                voice_actors.register_actor(actor)
+        logger = logging.getLogger(__name__)
+        logger.info(f"Loading from {config_path}")
+        config: Config = Config.from_path(config_path)
+        agents: List[Agent] = []
+        # TODO: Make this neater
+        openai: OpenAI = _get_openai(config)
+        for agent_conf in config.agents:
+            agent = agent_conf.create_agent(config.prompt_config, openai=openai)
+            agents.append(agent)
 
-            messages_path: Optional[Path] = config.messages_path
-            self.state_machine: StateMachine = StateMachine(
-                agents, voice_actors, messages_file=messages_path
-            )
-        else:
-            logger.info(f"Falling back to non config, create file at {config_path}")
-            self.state_machine: StateMachine = _create_old_state_machine()
+        voice_actors: VoiceActorManager = VoiceActorManager()
+        for actor_config in config.voice_actors:
+            actor: VoiceActor = actor_config.create_actor()
+            voice_actors.register_actor(actor)
+
+        messages_path: Optional[Path] = config.messages_path
+        self.state_machine: StateMachine = StateMachine(
+            agents, voice_actors, messages_file=messages_path
+        )
 
         if len(self.state_machine.messages) <= 0:
             # Add a message with the player names so everyone knows who is present
@@ -269,58 +268,6 @@ def _get_openai(config: Config) -> OpenAI:
     else:
         openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
         return OpenAI(api_key=openai_api_key)
-
-
-def _create_old_state_machine() -> StateMachine:
-    openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
-    if not openai_api_key:
-        raise ValueError("No OPENAI_API_KEY defined")
-    openai = OpenAI(api_key=openai_api_key)
-
-    prefix_path = "prompts/prefix.md"
-    suffix_path = "prompts/suffix.md"
-    agents: List[Agent] = [
-        OpenAIAgent.load_prompt(
-            "Vex",
-            "prompts/vex.md",
-            openai,
-            model="gpt-5-mini",
-            prefix_path=prefix_path,
-            suffix_path=suffix_path,
-        ),
-        OpenAIAgent.load_prompt(
-            "Garry",
-            "prompts/garry.md",
-            openai,
-            model="gpt-5-mini",
-            prefix_path=prefix_path,
-            suffix_path=suffix_path,
-        ),
-        OpenAIAgent.load_prompt(
-            "Bleb",
-            "prompts/bleb.md",
-            openai,
-            model="gpt-5-mini",
-            prefix_path=prefix_path,
-            suffix_path=suffix_path,
-        ),
-    ]
-    voice_actors: VoiceActorManager = VoiceActorManager()
-    garry_actor = PiperVoiceActor(["Garry"], "piper-models/en_US-lessac-medium.onnx")
-    voice_actors.register_actor(garry_actor)
-    other_actor = PiperVoiceActor(
-        ["Vex", "Bleb"], "piper-models/en_US-libritts-high.onnx"
-    )
-    other_actor.set_speaker_id_for("Vex", 14)
-    other_actor.set_speaker_id_for("Bleb", 20)
-    voice_actors.register_actor(other_actor)
-
-    messages_path: Optional[Path] = None
-    messages_path = os.getenv("MESSAGES_PATH")
-    if messages_path:
-        messages_path = Path(messages_path)
-
-    return StateMachine(agents, voice_actors, messages_file=messages_path)
 
 
 def setup_logging(level: int = logging.INFO, logfile: str | None = None) -> None:
