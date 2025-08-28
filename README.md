@@ -9,6 +9,9 @@ Specifically it is trying to do something similar to his
 [Multi-Agent-GPT-Characters
 repository](https://github.com/DougDougGithub/Multi-Agent-GPT-Characters).
 
+I have a blog post detailing this project:
+[lyndon.codes/2025/08/26/toying-with-ai-rpg-party-members/](https://lyndon.codes/2025/08/26/toying-with-ai-rpg-party-members/)
+
 [![asciicast](https://asciinema.org/a/DGBLtVsD6PAoNtKv19wQ5SRT6.svg)](https://asciinema.org/a/DGBLtVsD6PAoNtKv19wQ5SRT6)
 
 ## Building
