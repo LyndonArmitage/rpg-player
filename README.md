@@ -9,6 +9,8 @@ Specifically it is trying to do something similar to his
 [Multi-Agent-GPT-Characters
 repository](https://github.com/DougDougGithub/Multi-Agent-GPT-Characters).
 
+[![asciicast](https://asciinema.org/a/DGBLtVsD6PAoNtKv19wQ5SRT6.svg)](https://asciinema.org/a/DGBLtVsD6PAoNtKv19wQ5SRT6)
+
 ## Building
 
 I have built this project using Python 3.13.5 and the
@@ -78,7 +80,7 @@ response from AI Agents or respond themselves.
 ### Modules
 
 The code has been split into multiple files and classes. Key information on
-them is below:
+them follows:
 
 #### ChatMessage and ChatMessages
 
@@ -151,3 +153,42 @@ depending on the Whisper model specified. The constructor allows configuring
 the model, language, and additional arguments for the underlying API. When
 using the default "whisper-1" model, only the synchronous API is available.
 Other models may allow streamed outputs delivered via a callback handler.
+
+### Textual App
+
+The `MainApp`, `Standby` and `NarrationScreen` are all parts of the
+[textual](https://textual.textualize.io/) UI framework for Python. This is the
+main way this application is used.
+
+`textual` apps are terminal applications. As mentioned earlier, you can run
+this using `textual run`. The main application is the `MainApp` class in
+`app.py` and makes use of the `Standby` and `NarrationScreen` classes which
+embody the two main screen for the app.
+
+### Other Tools
+
+There are multiple other small tools that are built alongside the main
+application.
+
+#### Session Summariser
+
+There is a simple session summariser application present in
+`summarise_session.py`.
+
+This tool takes in a messages file and outputs a new messages file containing
+summaries of the original file. It is designed to shorten the history of passed
+to LLMs without losing context.
+
+#### Voice Actor Testing
+
+There are 2 simple `VoiceActor` test apps for manually testing the various
+voice acting classes: `actor_tester.py` and `actor_tester2.py`.
+
+`actor_tester.py` is a small `textual` app for testing the audio from
+`VoiceActor` instances, specifically Piper TTS based actors. It allows you to
+test the various speakers of a single voice if there are multiples associated
+with it.
+
+`actor_tester2.py` is a bare bones Python script for testing audio from
+implementations. Specifically, it is geared towards making sure both WAV
+file playing and streamed audio playing.
