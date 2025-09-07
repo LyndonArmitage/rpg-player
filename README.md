@@ -208,13 +208,13 @@ to LLMs without losing context.
 #### Voice Actor Testing
 
 There are 2 simple `VoiceActor` test apps for manually testing the various
-voice acting classes: `actor_tester.py` and `actor_tester2.py`.
+voice acting classes: `actor_tester.py` and `piper_actor_tester.py`.
 
 `actor_tester.py` is a small `textual` app for testing the audio from
 `VoiceActor` instances, specifically Piper TTS based actors. It allows you to
 test the various speakers of a single voice if there are multiples associated
 with it.
 
-`actor_tester2.py` is a bare bones Python script for testing audio from
-implementations. Specifically, it is geared towards making sure both WAV
-file playing and streamed audio playing.
+`piper_actor_tester.py` is a bare bones Python script for testing audio from
+the Piper TTS implementation. Specifically, it is geared towards making sure
+both WAV file playing and streamed audio playing works.
