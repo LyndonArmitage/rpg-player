@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import queue
@@ -10,7 +11,8 @@ from typing import Dict, Iterable, List, Optional, Set, Union, override
 
 import onnxruntime as ort
 import sounddevice as sd
-from openai import OpenAI
+from openai import AsyncOpenAI, OpenAI
+from openai.helpers import LocalAudioPlayer
 from piper.voice import PiperVoice, SynthesisConfig
 
 from chat_message import ChatMessage, MessageType
@@ -359,6 +361,8 @@ class OpenAIVoiceActor(VoiceActor):
     You will need to provide a model, the voice to use and the names of the
     authors this voice is for. You can and should also supply instructions as
     this will help the voice sound as intended.
+
+    See https://www.openai.fm/ for help and inspiration.
     """
 
     # Map for output type to suffixes
@@ -391,6 +395,11 @@ class OpenAIVoiceActor(VoiceActor):
         except KeyError:
             raise ValueError(f"Unsupported response_format: {response_format!r}")
 
+        # Create an Async client using the OpenAI client
+        api_key = getattr(openai, "api_key", None)
+        base_url = getattr(openai, "base_url", None)
+        self.async_openai = AsyncOpenAI(api_key=api_key, base_url=base_url)
+
     @property
     @override
     def speaker_names(self) -> Set[str]:
@@ -401,6 +410,17 @@ class OpenAIVoiceActor(VoiceActor):
         return (message.author.casefold() in self.names) and (
             message.type == MessageType.SPEECH
         )
+
+    def _create_kw_dict(self, message: ChatMessage) -> dict:
+        kw = {
+            "model": self.model,
+            "voice": self.voice,
+            "input": message.content,
+            "response_format": self.response_format,
+        }
+        if self.instructions:
+            kw["instructions"] = self.instructions
+        return kw
 
     @override
     def speak_message(self, message: ChatMessage, folder_path: Path) -> Path:
@@ -413,17 +433,9 @@ class OpenAIVoiceActor(VoiceActor):
         ) as f:
             out_path = Path(f.name)
 
+        # Store keywords in a dict
+        kw = self._create_kw_dict(message)
         try:
-            # Store keywords in a dict
-            kw = {
-                "model": self.model,
-                "voice": self.voice,
-                "input": message.content,
-                "response_format": self.response_format,
-            }
-            if self.instructions:
-                kw["instructions"] = self.instructions
-
             with self.openai.audio.speech.with_streaming_response.create(
                 **kw
             ) as response:
@@ -440,11 +452,36 @@ class OpenAIVoiceActor(VoiceActor):
     @property
     @override
     def can_speak_out_loud(self) -> bool:
-        return False
+        return True
 
     @override
     def speak_message_out_load(self, message: ChatMessage) -> None:
-        raise NotImplementedError
+
+        kw = self._create_kw_dict(message)
+        # Override the format to be low-latency
+        kw["response_format"] = "pcm"
+
+        async def _play_async():
+            async with self.async_openai.audio.speech.with_streaming_response.create(
+                **kw
+            ) as resp:
+                await LocalAudioPlayer().play(resp)
+
+        try:
+            asyncio.get_running_loop()
+
+            def runner():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(_play_async())
+                finally:
+                    loop.close()
+
+            threading.Thread(target=runner, daemon=True).start()
+        except RuntimeError:
+            # Not running inn loop, so run it directly and block until done
+            asyncio.run(_play_async())
 
 
 class VoiceActorManager:
