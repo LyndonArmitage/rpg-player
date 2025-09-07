@@ -214,13 +214,14 @@ There is a simple session summariser application present in
 `summarise_session.py`.
 
 This tool takes in a messages file and outputs a new messages file containing
-summaries of the original file. It is designed to shorten the history of passed
-to LLMs without losing context.
+summaries of the original file. It is designed to shorten the history passed to
+LLMs without losing context.
 
 #### Voice Actor Testing
 
-There are 2 simple `VoiceActor` test apps for manually testing the various
-voice acting classes: `actor_tester.py` and `piper_actor_tester.py`.
+There are 3 simple `VoiceActor` test apps for manually testing the various
+voice acting classes: `actor_tester.py`, `piper_actor_tester.py`, and
+`openai_actor_tester.py`.
 
 `actor_tester.py` is a small `textual` app for testing the audio from
 `VoiceActor` instances, specifically Piper TTS based actors. It allows you to
@@ -229,4 +230,11 @@ with it.
 
 `piper_actor_tester.py` is a bare bones Python script for testing audio from
 the Piper TTS implementation. Specifically, it is geared towards making sure
-both WAV file playing and streamed audio playing works.
+both WAV file playing and streamed audio playing works. Generally, I use this
+for testing output of various models without resorting to a UI.
+
+`openai_actor_tester.py` is a bare bones Python script just like
+`piper_actor_tester.py` but geared towards testing the OpenAI voice actor
+class. This is useful for testing the implementation itself as
+[openai.fm](https://www.openai.fm/) is a nicer interface for testing
+instructions and the voices.
