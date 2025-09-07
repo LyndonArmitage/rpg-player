@@ -20,25 +20,30 @@ from chat_message import ChatMessage, MessageType
 log = logging.getLogger(__name__)
 
 
-def _parse_names(names: Union[str, Iterable[str]]) -> Set[str]:
-    # Normalize names into a set of casefolded strings
-    if isinstance(names, str):
-        norm_names: Set[str] = {names.casefold()}
-    else:
-        # Ensure it's an iterable of strings
-        try:
-            norm_names = {n.casefold() for n in names}  # type: ignore[arg-type]
-        except TypeError:
-            raise TypeError("names must be a string or an iterable of strings")
-        if not all(isinstance(n, str) for n in names):  # type: ignore[iterable-issue]
-            raise TypeError("all elements of 'names' must be strings")
-    return norm_names
-
-
 class VoiceActor(ABC):
     """
     A VoiceActor is a class that can speak messages.
     """
+
+    @staticmethod
+    def parse_names(names: Union[str, Iterable[str]]) -> Set[str]:
+        """
+        Normalize names into a set of casefolded strings.
+
+        names can be a single string or some kind of Iterable
+        """
+        # Normalize names into a set of casefolded strings
+        if isinstance(names, str):
+            norm_names: Set[str] = {names.casefold()}
+        else:
+            # Ensure it's an iterable of strings
+            try:
+                norm_names = {n.casefold() for n in names}  # type: ignore[arg-type]
+            except TypeError:
+                raise TypeError("names must be a string or an iterable of strings")
+            if not all(isinstance(n, str) for n in names):  # type: ignore[iterable-issue]
+                raise TypeError("all elements of 'names' must be strings")
+        return norm_names
 
     @abstractmethod
     def speak_message(self, message: ChatMessage, folder_path: Path) -> Path:
@@ -116,7 +121,7 @@ class PiperVoiceActor(VoiceActor):
         model_path: Path,
         speaker_id: Optional[int] = None,
     ):
-        self.names: Set[str] = _parse_names(names)
+        self.names: Set[str] = VoiceActor.parse_names(names)
         self.supports_cuda: bool = (
             "CUDAExecutionProvider" in ort.get_available_providers()
         )
@@ -318,7 +323,7 @@ class EchoVoiceActor(VoiceActor):
     """
 
     def __init__(self, names: Union[str, Iterable[str]]):
-        self.names = _parse_names(names)
+        self.names = VoiceActor.parse_names(names)
 
     @property
     @override
@@ -384,7 +389,7 @@ class OpenAIVoiceActor(VoiceActor):
         response_format: str = "wav",
         instructions: Optional[str] = None,
     ):
-        self.names: Set[str] = _parse_names(names)
+        self.names: Set[str] = VoiceActor.parse_names(names)
         self.openai = openai
         self.model = model
         self.voice = voice
