@@ -123,12 +123,13 @@ constantly.
 
 The `VoiceActor` base class is a simple interface for taking a `ChatMessage`
 and turning it into speech. Its implementations decide if a given message
-should be voice acted by it, and can generate voice acting as a file.
+should be voice acted by it, and can generate voice acting as a file or stream
+it out as soon as it starts being generated.
 
 `VoiceActorManager` holds all the instances of `VoiceActor` and is responsible
 for calling them all and getting them to generate voice acting. It manages a
-temporary folder where the voice acting files should go, and which can be
-cleaned up upon exit.
+temporary folder where the voice acting files should end up, which it is
+responsible for cleaning up.
 
 Generally, the voice acting files produced should be cleaned up elsewhere,
 after they have been played to avoid storing lots of unneeded files.
@@ -142,7 +143,18 @@ instructions as part of its input. [OpenAI.fm](https://www.openai.fm/) has
 examples of how instructions and voices work together. Sufficed to say, the
 instructions can control the general _vibe_ of a voice including tone, dialect,
 pronunciation and features. Generally, you should align this with your agent's
-prompt for a satisfying voice experience.
+prompt for a satisfying voice experience. `OpenAIVoiceActor` supports streaming
+audio, avoiding the need for storing intermediate files.
+
+The `PiperVoiceActor` class uses Piper TTS and local models to generate voice
+lines without going out to the internet. This can mean lower-latency responses,
+although it depends on your computer. Quality of Piper models varies widely.
+There's a great website with samples of various models at
+[rhasspy.github.io/piper-samples](https://rhasspy.github.io/piper-samples/).
+Some models feature multiple speakers, allowing you to load a single model and
+have a single `VoiceActor` class represent multiple speakers. `PiperVoiceActor`
+supports streaming audio for slightly lower-latency and non-storage of
+intermediate voice files.
 
 #### Agent
 
