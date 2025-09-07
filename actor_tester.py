@@ -13,7 +13,8 @@ from textual.widgets import Button, Footer, Header, Label, Rule, Select, TextAre
 
 from audio_player import AudioPlayer, SoundDevicePlayer
 from chat_message import ChatMessage
-from voice_actor import PiperVoiceActor, VoiceActor
+from piper_voice_actor import PiperVoiceActor
+from voice_actor import VoiceActor
 
 
 class ChooseSpeakerId(ModalScreen[str]):

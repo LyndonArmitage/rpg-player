@@ -7,7 +7,8 @@ from typing import Dict, List, Optional, Union
 from openai import OpenAI
 
 from agent import Agent, OpenAIAgent
-from voice_actor import PiperVoiceActor, VoiceActor
+from piper_voice_actor import PiperVoiceActor
+from voice_actor import VoiceActor
 
 
 @dataclass

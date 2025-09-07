@@ -145,16 +145,3 @@ class VoiceActorManager:
                         paths.append(path)
                         spoke = True
         return (spoke, paths)
-
-
-# Re-export common implementations for backward compatibility. These imports
-# are optional and wrapped to avoid failing imports if heavy dependencies are
-# not available at import time.
-try:
-    from piper_voice_actor import PiperVoiceActor  # noqa: F401
-    from echo_voice_actor import EchoVoiceActor  # noqa: F401
-    from openai_voice_actor import OpenAIVoiceActor  # noqa: F401
-except Exception:
-    # Ignore import errors so the base module can be imported without the
-    # optional heavy dependencies.
-    pass

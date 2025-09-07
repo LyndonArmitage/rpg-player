@@ -7,7 +7,8 @@ from openai import OpenAI
 
 from audio_player import AudioPlayer, SoundDevicePlayer
 from chat_message import ChatMessage
-from voice_actor import OpenAIVoiceActor, VoiceActor
+from openai_voice_actor import OpenAIVoiceActor
+from voice_actor import VoiceActor
 
 # Voices are:
 # alloy
