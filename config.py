@@ -9,6 +9,7 @@ from openai import OpenAI
 
 from agent import Agent, OpenAIAgent
 from elevenlabs_voice_actor import ElevenlabsVoiceActor
+from openai_voice_actor import OpenAIVoiceActor
 from piper_voice_actor import PiperVoiceActor
 from voice_actor import VoiceActor
 
@@ -92,7 +93,9 @@ class VoiceActorConfig:
             case "piper":
                 return self._create_piper_actor()
             case "elevenlabs":
-                return self._create_elevenlabs_actor()
+                return self._create_elevenlabs_actor(api_keys)
+            case "openai":
+                return self._create_openai_actor(api_keys)
         raise NotImplementedError(f"Not implemented for type: {self.type}")
 
     def _create_piper_actor(self) -> PiperVoiceActor:
@@ -126,6 +129,15 @@ class VoiceActorConfig:
                 self.speakers, client, voice_id, model_id=model_id
             )
 
+    def _create_openai_actor(self, api_keys: Optional[APIKeys]) -> OpenAIVoiceActor:
+        client: OpenAI = None
+        if api_keys:
+            client = api_keys.get_openai_client()
+        else:
+            client = OpenAI()
+        args: dict = self.args
+        return OpenAIVoiceActor(self.speakers, client, **args)
+
 
 @dataclass
 class Config:
@@ -157,7 +169,7 @@ class Config:
             )
 
         def parse_api_keys(d: dict) -> APIKeys:
-            return APIKeys(openai=d.get("openai"))
+            return APIKeys(openai=d.get("openai"), elevenlabs=d.get("elevenlabs"))
 
         def parse_agent(d: dict) -> AgentConfig:
             return AgentConfig(
