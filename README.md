@@ -156,6 +156,16 @@ have a single `VoiceActor` class represent multiple speakers. `PiperVoiceActor`
 supports streaming audio for slightly lower-latency and non-storage of
 intermediate voice files.
 
+The `ElevenlabsVoiceActor` class uses [ElevenLabs](https://elevenlabs.io/)
+online TTS models to generate excellent audio quickly. You'll need to provide
+an API key to use them, along with the `voice_id` and possibly `model_id`
+(default is their flash model).
+
+The `BasicVoiceActor` class uses the `pyttsx3` library to generate local speech
+using your systems installed text-to-speech APIs. It's likely the fastest voice
+actor implementation you can use, but the voice will be robotic. This could be
+useful for a robotic character or for simple testing.
+
 #### Agent
 
 The `Agent` base class and its implementations are core to the project, as they
