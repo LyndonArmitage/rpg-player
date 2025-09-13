@@ -13,7 +13,7 @@ from voice_actor import VoiceActor
 
 
 def main():
-    api_key = os.getenv("ELEVEN_LABS_API_KEY")
+    api_key = os.getenv("ELEVENLABS_API_KEY")
     elevenlabs = ElevenLabs(api_key=api_key)
     voice_id = "YXpFCvM1S3JbWEJhoskW"
     model_id = "eleven_flash_v2_5"

@@ -238,7 +238,7 @@ class MainApp(App):
 
         voice_actors: VoiceActorManager = VoiceActorManager()
         for actor_config in config.voice_actors:
-            actor: VoiceActor = actor_config.create_actor()
+            actor: VoiceActor = actor_config.create_actor(config.api_keys)
             voice_actors.register_actor(actor)
 
         messages_path: Optional[Path] = config.messages_path

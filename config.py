@@ -4,9 +4,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
+from elevenlabs.client import ElevenLabs
 from openai import OpenAI
 
 from agent import Agent, OpenAIAgent
+from elevenlabs_voice_actor import ElevenlabsVoiceActor
 from piper_voice_actor import PiperVoiceActor
 from voice_actor import VoiceActor
 
@@ -14,6 +16,7 @@ from voice_actor import VoiceActor
 @dataclass
 class APIKeys:
     openai: Optional[str] = None
+    elevenlabs: Optional[str] = None
 
     def get_openai_client(self) -> OpenAI:
         """
@@ -25,6 +28,18 @@ class APIKeys:
             log = logging.getLogger(__name__)
             log.warning("Using OpenAI Key from environment")
             return OpenAI()
+
+    def get_elevenlabs_client(self) -> ElevenLabs:
+        """
+        Get an Elevenlabs client using the config or environment for the API
+        key
+        """
+        if self.elevenlabs:
+            return ElevenLabs(api_key=self.elevenlabs)
+        else:
+            log = logging.getLogger(__name__)
+            log.warning("Using ElevenLabs Key from environment")
+            return ElevenLabs()
 
 
 @dataclass
@@ -72,10 +87,12 @@ class VoiceActorConfig:
     speakers: List[str]
     args: dict
 
-    def create_actor(self) -> VoiceActor:
+    def create_actor(self, api_keys: Optional[APIKeys]) -> VoiceActor:
         match self.type.casefold():
             case "piper":
                 return self._create_piper_actor()
+            case "elevenlabs":
+                return self._create_elevenlabs_actor()
         raise NotImplementedError(f"Not implemented for type: {self.type}")
 
     def _create_piper_actor(self) -> PiperVoiceActor:
@@ -88,6 +105,26 @@ class VoiceActorConfig:
         for name, speaker_id in speaker_ids.items():
             actor.set_speaker_id_for(name, speaker_id)
         return actor
+
+    def _create_elevenlabs_actor(
+        self, api_keys: Optional[APIKeys]
+    ) -> ElevenlabsVoiceActor:
+        client: ElevenLabs = None
+        if api_keys:
+            client = api_keys.get_elevenlabs_client()
+        else:
+            client = ElevenLabs()
+        args: dict = self.args
+        voice_id: Optional[str] = args.get("voice_id")
+        if not voice_id:
+            raise ValueError("Missing 'voice_id' from args")
+        model_id: Optional[str] = args.get("model_id")
+        if not model_id:
+            return ElevenlabsVoiceActor(self.speakers, client, voice_id)
+        else:
+            return ElevenlabsVoiceActor(
+                self.speakers, client, voice_id, model_id=model_id
+            )
 
 
 @dataclass
