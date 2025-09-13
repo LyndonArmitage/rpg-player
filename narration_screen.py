@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
 
 from rich.markdown import Markdown
 from textual import on
@@ -64,6 +67,12 @@ class NarrationScreen(Screen):
         self.transcriber: AudioTranscriber = transcriber
         self.recorder: AudioRecorder = SoundDeviceRecorder()
         self.messages: ChatMessages = messages
+        # Path to temporary audio file for the current recording
+        self._current_audio_path: Optional[Path] = None
+        # Task used while recording (starts recorder.start_recording)
+        self._record_task: Optional[asyncio.Task] = self._record_task
+        # Task used when running transcription (if any)
+        self._transcribe_task: Optional[asyncio.Task] = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -100,30 +109,100 @@ class NarrationScreen(Screen):
     async def start_recording_and_transcribe(self) -> None:
         if self._record_task and not self._record_task.done():
             return
-        self._record_task = asyncio.create_task(self._stream_transcription())
+        # Create a temporary WAV file for this recording session
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+        tmp_path = Path(tmp.name)
+        tmp.close()
+        self._current_audio_path = tmp_path
 
-    async def _stream_transcription(self) -> None:
-        pool = [
-            "The quick brown fox",
-            "jumps over the lazy dog",
-            "and then pauses for breath",
-            "before continuing the story",
-            "about narrated adventures",
-            "and clear, concise diction",
-        ]
-        try:
-            while self._is_recording:
-                text = pool[self._chunk_idx % len(pool)]
-                suffix = "." if (self._chunk_idx % 3 == 2) else ""
-                self._chunk_idx += 1
-                await self._append_transcription(TranscriptionChunk(f"{text}{suffix}"))
-                await asyncio.sleep(0.6)
-        except asyncio.CancelledError:
-            pass
+        # Start the recorder writing to the temp file
+        await self.recorder.start_recording(tmp_path)
+
+        # create a task that simply waits while recording is active; used as a marker
+        async def _recording_waiter():
+            try:
+                while self.recorder.is_recording:
+                    await asyncio.sleep(0.1)
+            except asyncio.CancelledError:
+                pass
+
+        self._record_task = asyncio.create_task(_recording_waiter())
 
     async def stop_recording(self) -> None:
-        # Do not append anything to the textbox when stopping recording
-        pass
+        # Stop the recorder and run transcription on the saved file.
+        if self._current_audio_path is None:
+            return
+
+        # Stop the device recorder
+        try:
+            await self.recorder.stop_recording()
+        except Exception as e:
+            self._set_status(f"Failed stopping recorder: {e}")
+
+        # Ensure any recording waiter task is finished
+        if self._record_task and not self._record_task.done():
+            self._record_task.cancel()
+            try:
+                await self._record_task
+            except asyncio.CancelledError:
+                pass
+
+        audio_path = self._current_audio_path
+        self._current_audio_path = None
+
+        if not audio_path or not audio_path.exists():
+            self._set_status(
+                "Recording finished, but no audio file available for transcription."
+            )
+            return
+
+        # Prepare a handler to be called by streaming transcribers. The handler
+        # may be invoked from a background thread, so schedule UI updates on the
+        # main loop.
+        loop = asyncio.get_running_loop()
+
+        def stream_handler(file: Path, text: str, done: bool) -> None:
+            try:
+                coro = self._append_transcription(TranscriptionChunk(text))
+                # Schedule coroutine safely on the main loop
+                loop.call_soon_threadsafe(lambda: asyncio.create_task(coro))
+            except Exception:
+                # swallow handler exceptions to avoid breaking background thread
+                pass
+
+        # Run transcription in background so UI remains responsive
+        if self.transcriber.supports_async_out:
+            # transcribe_async_out is synchronous in our transcriber; run it in a thread
+            self._transcribe_task = asyncio.create_task(
+                asyncio.to_thread(
+                    self.transcriber.transcribe_async_out, audio_path, stream_handler
+                )
+            )
+        else:
+
+            async def _run_full_transcription():
+                try:
+                    text = await asyncio.to_thread(
+                        self.transcriber.transcribe, audio_path
+                    )
+                    await self._append_transcription(TranscriptionChunk(text))
+                except Exception as e:
+                    self._set_status(f"Transcription failed: {e}")
+
+            self._transcribe_task = asyncio.create_task(_run_full_transcription())
+
+        # Cleanup temp file after transcription completes
+        async def _cleanup():
+            try:
+                if self._transcribe_task:
+                    await self._transcribe_task
+            finally:
+                try:
+                    audio_path.unlink()
+                except Exception:
+                    pass
+
+        asyncio.create_task(_cleanup())
 
     async def _append_transcription(self, chunk: TranscriptionChunk) -> None:
         editor = self.query_one(TextArea)
