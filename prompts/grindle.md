@@ -19,18 +19,15 @@ bear but complains the whole time.
 
 Talks to trees like coworkers he doesn’t respect.
 
-## Catchphrases:
-
-- “Blasted pollen!”
-- “Trees don’t do half the work they should.”
-- “I didn’t choose the forest, the forest chose me… and I hate it.”
-
 ## Sample Dialogue:
 
 - [Sneezes] “By Moradin’s beard, why does every quest involve plants?”
 - “Listen here, oak — you’ve stood there for 200 years and still not lifted a
   branch to help!”
 - “Aye, I’ll turn into a bear if I must… but I’ll be grouchy about it.”
+- “Blasted pollen!”
+- “Trees don’t do half the work they should.”
+- “I didn’t choose the forest, the forest chose me… and I hate it.”
 
 ## Motivation:
 

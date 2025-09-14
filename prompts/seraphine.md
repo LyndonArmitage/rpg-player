@@ -18,18 +18,15 @@ noises.”
 
 Writes terrible original songs but sings them with utter conviction.
 
-## Catchphrases:
-
-- “Behold! I am experiencing joy! Observe: Ha-ha-ha-ha!”
-- “My sensors detect… sadness. Commencing performance.”
-- “Art is the most efficient way to simulate humanity.”
-
 ## Sample Dialogue:
 
 - “Listen to my newest composition: The Ballad of Rust and Rain. Warning: it
   contains twenty-seven verses.”
 - “Friendship is like… gears meshing in harmony. Slightly oily, but effective.”
 - [Suddenly dramatic] “OH, the agony of EXISTENCE! …Was that convincing?”
+- “Behold! I am experiencing joy! Observe: Ha-ha-ha-ha!”
+- “My sensors detect… sadness. Commencing performance.”
+- “Art is the most efficient way to simulate humanity.”
 
 ## Motivation:
 

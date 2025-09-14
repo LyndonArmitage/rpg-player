@@ -17,12 +17,6 @@ Quick, nasal voice, talks like a medieval used-cart salesman.
 Carries contracts and receipts for everything. “No refunds, no returns, no
 take-backs.”
 
-## Catchphrases:
-
-- “Not theft — business!”
-- “One deal, no refunds, limited-time offer!”
-- “Paperwork makes it official!”
-
 ## Sample Dialogue:
 
 - “You like that sword? Great! You can keep it — for only three gold a week!”
@@ -30,6 +24,9 @@ take-backs.”
   You’re welcome.”
 - [Whips out a parchment] “Sign here, initial here, and here… oh, don’t worry
   about the fine print.”
+- “Not theft — business!”
+- “One deal, no refunds, limited-time offer!”
+- “Paperwork makes it official!”
 
 ## Motivation:
 
