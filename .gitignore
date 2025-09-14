@@ -208,3 +208,4 @@ piper-models/
 *.onnx.json
 config.json
 *.cast
+config.toml

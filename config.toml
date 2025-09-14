@@ -1,0 +1,47 @@
+messages_path = "testing.log"
+
+[prompt_config]
+prefix_path = "prompts/prefix.md"
+suffix_path = "prompts/suffix.md"
+
+[[agents]]
+name = "Vex"
+prompt_path = "prompts/vex.md"
+type = "openai"
+
+[agents.args]
+model = "gpt-5-mini"
+
+[[agents]]
+name = "Garry"
+prompt_path = "prompts/garry.md"
+type = "openai"
+
+[agents.args]
+model = "gpt-5-mini"
+
+[[agents]]
+name = "Bleb"
+prompt_path = "prompts/bleb.md"
+type = "openai"
+
+[agents.args]
+model = "gpt-5-mini"
+
+[[voice_actors]]
+type = "piper"
+speakers = ["Garry"]
+
+[voice_actors.args]
+model_path = "piper-models/en_US-lessac-medium.onnx"
+
+[[voice_actors]]
+type = "piper"
+speakers = ["Vex", "Bleb"]
+
+[voice_actors.args]
+model_path = "piper-models/en_US-libritts-high.onnx"
+
+[voice_actors.args.speaker_ids]
+Vex = 14
+Bleb = 20
