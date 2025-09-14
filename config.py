@@ -1,5 +1,6 @@
 import json
 import logging
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Union
@@ -219,6 +220,7 @@ class Config:
         match extension:
             case ".json":
                 return Config.from_dict(json.loads(path.read_text()))
-            # TODO: Allow for TOML config
+            case ".toml":
+                return Config.from_dict(tomllib.loads(path.read_text()))
 
         raise ValueError(f"path was not a valid config file: {path}")

@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import logging
 import os
@@ -221,8 +222,14 @@ class Standby(Screen):
 class MainApp(App):
     TITLE = "RPG Party"
 
+    def __init__(self, config_path: Optional[Path] = None):
+        super().__init__()
+        if not config_path:
+            config_path = Path("config.json")
+        self.config_path: Path = config_path
+
     def on_ready(self) -> None:
-        config_path: Path = Path("config.json")
+        config_path: Path = self.config_path
         if not config_path.exists() or not config_path.is_file():
             raise ValueError(f"No config at {config_path}")
 
@@ -288,5 +295,18 @@ def setup_logging(level: int = logging.INFO, logfile: str | None = None) -> None
 if __name__ == "__main__":
     load_dotenv()
     setup_logging()
-    app = MainApp()
+    parser = argparse.ArgumentParser(prog="app", description="Run the main application")
+    parser.add_argument(
+        "-c",
+        "--config",
+        help=(
+            "The path to the config file to use. If omitted, config.json will "
+            "be used. Can be a JSON or TOML file."
+        ),
+        type=Path,
+        default=Path("config.json"),
+        dest="config_path",
+    )
+    args = parser.parse_args()
+    app = MainApp(args.config_path)
     app.run()

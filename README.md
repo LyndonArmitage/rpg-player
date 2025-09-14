@@ -32,6 +32,8 @@ You can then run this project with:
 
 ```sh
 uv run python app.py
+# Or if you are in the virtual environment:
+python app.py
 ```
 
 Or use textual:
@@ -42,6 +44,9 @@ uv run textual run app.py
 uv run textual console
 uv run textual run --dev app.py
 ```
+
+**Note:** When running with `textual`, you will not be able to provide
+arguments as you can with the python command.
 
 For `piper-tts` models, you can download them like so:
 
@@ -132,6 +137,10 @@ example:
   another for both "Vex" and "Bleb"
 - Both voice actor instances are using the Piper TTS type but different models
 - The OpenAI API Key has been provided via an environment variable
+
+You can also use [TOML](https://toml.io/) instead of JSON if you prefer, but
+you will have to set the configuration file with the `--config` argument, e.g.
+`--config example.toml`.
 
 ## Building
 
