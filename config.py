@@ -8,10 +8,10 @@ from elevenlabs.client import ElevenLabs
 from openai import OpenAI
 
 from agent import Agent, OpenAIAgent
+from basic_voice_actor import BasicVoiceActor
 from elevenlabs_voice_actor import ElevenlabsVoiceActor
 from openai_voice_actor import OpenAIVoiceActor
 from piper_voice_actor import PiperVoiceActor
-from tts_voice_actor import BasicVoiceActor
 from voice_actor import VoiceActor
 
 

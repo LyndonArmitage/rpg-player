@@ -5,8 +5,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from audio_player import AudioPlayer, SoundDevicePlayer
+from basic_voice_actor import BasicVoiceActor
 from chat_message import ChatMessage
-from tts_voice_actor import BasicVoiceActor
 from voice_actor import VoiceActor
 
 
