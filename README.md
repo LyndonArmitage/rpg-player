@@ -60,7 +60,76 @@ configuration file. Likewise, for Elevenlabs, you should provide your API key
 in the `config.json` or environment variable.
 
 See `config.py` for the configuration code data classes that are read from the
-JSON `config.json` file.
+JSON `config.json` file. Below is a simple example `config.json`:
+
+```json
+{
+  "prompt_config": {
+    "prefix_path": "prompts/prefix.md",
+    "suffix_path": "prompts/suffix.md"
+  },
+  "messages_path": "game.log",
+  "agents": [
+    {
+      "name": "Vex",
+      "prompt_path": "prompts/vex.md",
+      "type": "openai",
+      "args": {
+        "model": "gpt-5-mini"
+      }
+    },
+    {
+      "name": "Garry",
+      "prompt_path": "prompts/garry.md",
+      "type": "openai",
+      "args": {
+        "model": "gpt-5-mini"
+      }
+    },
+    {
+      "name": "Bleb",
+      "prompt_path": "prompts/bleb.md",
+      "type": "openai",
+      "args": {
+        "model": "gpt-5-mini"
+      }
+    }
+  ],
+  "voice_actors": [
+    {
+      "type": "piper",
+      "speakers": ["Garry"],
+      "args": {
+        "model_path": "piper-models/en_US-lessac-medium.onnx"
+      }
+    },
+    {
+      "type": "piper",
+      "speakers": ["Vex", "Bleb"],
+      "args": {
+        "model_path": "piper-models/en_US-libritts-high.onnx",
+        "speaker_ids": {
+          "Vex": 14,
+          "Bleb": 20
+        }
+      }
+    }
+  ]
+}
+```
+
+Note that only 3 agents are currently supported in the UI. In the above
+example:
+
+- A prefix and suffix prompt have been specified, these will be used by all
+  agents
+- The path to the messages file where game state will be stored has been set
+- 3 agents have been specified with their specific names, prompts, type and
+  arguments provided
+- 2 voice actor instances have been configured, 1 for the speaker "Garry", and
+  another for both "Vex" and "Bleb"
+- Both voice actor instances are using the Piper TTS type but different models
+- The OpenAI API Key has been provided via an environment variable
 
 ## Building
 
