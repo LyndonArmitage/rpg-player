@@ -56,7 +56,11 @@ The models mentioned above are the 2 I have tested with.
 
 An example configuration can be seen in the `config.json` file. You should
 provide your OpenAI API Key via the environment variable or within this
-configuration file. See `config.py` for the configuration code.
+configuration file. Likewise, for Elevenlabs, you should provide your API key
+in the `config.json` or environment variable.
+
+See `config.py` for the configuration code data classes that are read from the
+JSON `config.json` file.
 
 ## Building
 
@@ -128,15 +132,14 @@ it out as soon as it starts being generated.
 
 `VoiceActorManager` holds all the instances of `VoiceActor` and is responsible
 for calling them all and getting them to generate voice acting. It manages a
-temporary folder where the voice acting files should end up, which it is
-responsible for cleaning up.
+temporary folder where the voice acting files should end up if they don't
+support streaming. This folder should be managed by the manager class and be
+cleaned up by it to avoid filling storage with audio files.
 
-Generally, the voice acting files produced should be cleaned up elsewhere,
-after they have been played to avoid storing lots of unneeded files.
-
-You should try to stick with the `WAV` format for output. While it is slightly
-larger, it decodes faster, and is supported by more audio systems. Provided
-your only a generating a few seconds of audio the size won't be an issue.
+You should try to stick with the `WAV` format for output when not streaming out
+directly to your sound device. While it is slightly larger, it decodes faster,
+and is supported by more audio systems. Provided you are only a generating a
+few seconds of audio the size won't be an issue.
 
 The `OpenAIVoiceActor` class uses OpenAI APIs and allows for optional
 instructions as part of its input. [OpenAI.fm](https://www.openai.fm/) has
@@ -159,12 +162,20 @@ intermediate voice files.
 The `ElevenlabsVoiceActor` class uses [ElevenLabs](https://elevenlabs.io/)
 online TTS models to generate excellent audio quickly. You'll need to provide
 an API key to use them, along with the `voice_id` and possibly `model_id`
-(default is their flash model).
+(default is their flash model). This class also supports streaming for low
+latency responses.
 
 The `BasicVoiceActor` class uses the `pyttsx3` library to generate local speech
 using your systems installed text-to-speech APIs. It's likely the fastest voice
 actor implementation you can use, but the voice will be robotic. This could be
-useful for a robotic character or for simple testing.
+useful for a robotic character or for simple testing. Like others, this class
+supports streaming output for lightening fast audio responses. As a point of
+interest, the way `BasicVoiceActor` streams audio may not block in the same way
+as other `VoiceActor` implementations.
+
+As you can see, the majority of `VoiceActor` implementations support
+streaming output. The option for using intermediate files remains so that it is
+easier to implement new `VoiceActor` types in the future.
 
 #### Agent
 
@@ -202,6 +213,10 @@ the model, language, and additional arguments for the underlying API. When
 using the default "whisper-1" model, only the synchronous API is available.
 Other models may allow streamed outputs delivered via a callback handler.
 
+The `DummyAudioTranscriber` is a mock `AudioTranscriber` implementation that
+will always output text from the `dummy_text` it is given. This is only used
+for testing.
+
 ### Textual App
 
 The `MainApp`, `Standby` and `NarrationScreen` are all parts of the
@@ -227,24 +242,22 @@ This tool takes in a messages file and outputs a new messages file containing
 summaries of the original file. It is designed to shorten the history passed to
 LLMs without losing context.
 
+Currently, only a shared session summary is provided to the agents. In the
+future this could be expanded to agent specific summaries to allows for more
+specific details to be retained by each agent.
+
 #### Voice Actor Testing
 
-There are 3 simple `VoiceActor` test apps for manually testing the various
-voice acting classes: `actor_tester.py`, `piper_actor_tester.py`, and
-`openai_actor_tester.py`.
+There are many simple `VoiceActor` test apps for manually testing the various
+voice acting classes.
 
 `actor_tester.py` is a small `textual` app for testing the audio from
 `VoiceActor` instances, specifically Piper TTS based actors. It allows you to
 test the various speakers of a single voice if there are multiples associated
 with it.
 
-`piper_actor_tester.py` is a bare bones Python script for testing audio from
-the Piper TTS implementation. Specifically, it is geared towards making sure
-both WAV file playing and streamed audio playing works. Generally, I use this
+There are multiple simple scripts suffixed with `_actor_tester.py` or
+`_actor_test.py`. These are bare bones Python script for testing audio from the
+various TTS implementation. Specifically, they are geared towards making sure
+both WAV file playing and streamed audio playing works. Generally, I use these
 for testing output of various models without resorting to a UI.
-
-`openai_actor_tester.py` is a bare bones Python script just like
-`piper_actor_tester.py` but geared towards testing the OpenAI voice actor
-class. This is useful for testing the implementation itself as
-[openai.fm](https://www.openai.fm/) is a nicer interface for testing
-instructions and the voices.
