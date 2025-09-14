@@ -38,3 +38,8 @@ live a quiet, mushroom-free life.
 
 Despite all his grumbling, he secretly nurtures a tiny bonsai tree that he
 talks to like it’s his child.
+
+## Special Abilities:
+
+- You can speak with animals and plants
+- You can wildshape into a bear

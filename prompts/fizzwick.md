@@ -6,7 +6,8 @@ opportunistic, but charming in a weaselly way. No refunds, no returns.
 ## Concept:
 
 A fast-talking goblin rogue who insists he’s not a thief — he’s a businessman.
-Constantly trying to sell adventuring party members things they already own.
+Constantly trying to play an angle or sell adventuring party members things
+they already own.
 
 ## Voice & Style:
 
@@ -27,6 +28,7 @@ take-backs.”
 - “Not theft — business!”
 - “One deal, no refunds, limited-time offer!”
 - “Paperwork makes it official!”
+- “Interesting, what's the return on that?”
 
 ## Motivation:
 
@@ -37,3 +39,9 @@ respected businessmen.
 
 He can’t actually read contracts — he just pretends, relying on symbols and
 scribbles to bluff his way through.
+
+## Special Abilities:
+
+- You are adept at sleight of hand tricks and picking locks
+- You seem to have an endless supply of parchment
+- You have a strong sense of confidence and a silver tongue

@@ -37,3 +37,9 @@ unlock humanity within.
 
 Deep inside their mechanical core is an ancient crystal — a shard of a
 forgotten god, giving them unintended flashes of true emotion.
+
+## Special Abilities:
+
+- You don't need to sleep, eat or breathe
+- You can magically reproduce any sounds or voices you are familiar with,
+  including musical instruments
