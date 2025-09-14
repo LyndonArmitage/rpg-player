@@ -1,16 +1,18 @@
 # RPG Player
 
-This is a tool inspired by DougDoug's AI powered RPG Videos:
+A local multi-agent AI RPG tool inspired by DougDoug's AI RPG videos and the
+[Multi-Agent-GPT-Characters](https://github.com/DougDougGithub/Multi-Agent-GPT-Characters)
+repo.
+
+The videos that inspired this tool are:
 
 - https://www.youtube.com/watch?v=-82Ttuy2BtM
 - https://www.youtube.com/watch?v=TpYVyJBmH0g
 
-Specifically it is trying to do something similar to his
-[Multi-Agent-GPT-Characters
-repository](https://github.com/DougDougGithub/Multi-Agent-GPT-Characters).
-
 I have a blog post detailing this project:
 [lyndon.codes/2025/08/26/toying-with-ai-rpg-party-members/](https://lyndon.codes/2025/08/26/toying-with-ai-rpg-party-members/)
+
+Below is a simple ASCIICast of the initial application:
 
 [![asciicast](https://asciinema.org/a/DGBLtVsD6PAoNtKv19wQ5SRT6.svg)](https://asciinema.org/a/DGBLtVsD6PAoNtKv19wQ5SRT6)
 
