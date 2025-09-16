@@ -144,8 +144,8 @@ embody the two main screen for the app.
 ## Other Tools
 
 There are multiple other small tools that are built alongside the main
-application and bundled in the `scripts/` directory. These can be run using
-something like:
+application. Many are bundled in the `scripts/` directory. These can be run
+using something like:
 
 ```sh
 uv run python scripts/piper_actor_tester.py
@@ -164,6 +164,12 @@ LLMs without losing context.
 Currently, only a shared session summary is provided to the agents. In the
 future this could be expanded to agent specific summaries to allows for more
 specific details to be retained by each agent.
+
+This tool is part of the main application and useable by something like:
+
+```sh
+uv run python -m rpg_player.summarise_session
+```
 
 ### Voice Actor Testing
 
