@@ -167,6 +167,14 @@ Notes about the configuration example:
 You can also use TOML instead of JSON; pass `--config example.toml` to the
 application to load a TOML config file.
 
+For example:
+
+```sh
+# Using uv:
+uv run python -m rpg_player.app --config games/config.toml
+# This will use the config located at games/config.toml
+```
+
 ## Building / Packaging
 
 This project uses `pyproject.toml` with a `src/` layout. To work with the
