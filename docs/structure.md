@@ -144,7 +144,13 @@ embody the two main screen for the app.
 ## Other Tools
 
 There are multiple other small tools that are built alongside the main
-application.
+application and bundled in the `scripts/` directory. These can be run using
+something like:
+
+```sh
+uv run python scripts/piper_actor_tester.py
+# obviously replace with appropriate file name
+```
 
 ### Session Summariser
 

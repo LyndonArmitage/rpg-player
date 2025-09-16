@@ -1,10 +1,11 @@
+#!/usr/bin/env python3
 import math
 import struct
 import tempfile
 import wave
 from pathlib import Path
 
-from .audio_player import SoundDevicePlayer
+from rpg_player.audio_player import SoundDevicePlayer
 
 
 def generate_sine_wave(

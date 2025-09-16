@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import logging
 import tempfile
 from pathlib import Path
@@ -11,10 +12,10 @@ from textual.logging import TextualHandler
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, Footer, Header, Label, Rule, Select, TextArea
 
-from .audio_player import AudioPlayer, SoundDevicePlayer
-from .chat_message import ChatMessage
-from .piper_voice_actor import PiperVoiceActor
-from .voice_actor import VoiceActor
+from rpg_player.audio_player import AudioPlayer, SoundDevicePlayer
+from rpg_player.chat_message import ChatMessage
+from rpg_player.piper_voice_actor import PiperVoiceActor
+from rpg_player.voice_actor import VoiceActor
 
 
 class ChooseSpeakerId(ModalScreen[str]):

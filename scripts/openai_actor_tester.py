@@ -1,20 +1,51 @@
+#!/usr/bin/env python3
 import tempfile
 import time
 from pathlib import Path
 
-import onnxruntime as ort
 from dotenv import load_dotenv
+from openai import OpenAI
 
-from .audio_player import AudioPlayer, SoundDevicePlayer
-from .chat_message import ChatMessage
-from .piper_voice_actor import PiperVoiceActor
-from .voice_actor import VoiceActor
+from rpg_player.audio_player import AudioPlayer, SoundDevicePlayer
+from rpg_player.chat_message import ChatMessage
+from rpg_player.openai_voice_actor import OpenAIVoiceActor
+from rpg_player.voice_actor import VoiceActor
+
+# Voices are:
+# alloy
+# ash
+# ballad
+# coral
+# echo
+# fable
+# onyx
+# nova
+# sage
+# shimmer
+# verse
+VOICE = "coral"
+
+# Instructions describe how the voice should sound
+INSTRUCTIONS = """
+Voice:
+The voice should be deep, velvety, and effortlessly cool, like a late-night
+jazz radio host.
+
+Tone:
+The tone is smooth, laid-back, and inviting, creating a relaxed and easygoing
+atmosphere.
+
+Personality:
+The delivery exudes confidence, charm, and a touch of playful sophistication,
+as if guiding the listener through a luxurious experience.
+""".strip()
 
 
 def main():
-    print(f"ort providers: {ort.get_available_providers()}")
-    model_path = "piper-models/en_US-lessac-medium.onnx"
-    actor: VoiceActor = PiperVoiceActor("test", model_path)
+    openai = OpenAI()
+    actor: VoiceActor = OpenAIVoiceActor(
+        "Test", openai, model="gpt-4o-mini-tts", voice=VOICE, instructions=INSTRUCTIONS
+    )
     text = "This is a test audio file."
     message: ChatMessage = ChatMessage.speech("Test", text)
 
