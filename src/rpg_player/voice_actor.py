@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Iterable, List, Set, Union
 
-from chat_message import ChatMessage
+from .chat_message import ChatMessage
 
 log = logging.getLogger(__name__)
 

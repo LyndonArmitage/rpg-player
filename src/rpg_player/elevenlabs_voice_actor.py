@@ -8,8 +8,8 @@ from typing import Iterable, Set, Union, override
 import sounddevice as sd
 from elevenlabs.client import ElevenLabs
 
-from chat_message import ChatMessage, MessageType
-from voice_actor import VoiceActor
+from .chat_message import ChatMessage, MessageType
+from .voice_actor import VoiceActor
 
 log = logging.getLogger(__name__)
 

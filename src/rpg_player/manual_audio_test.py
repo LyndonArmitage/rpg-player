@@ -4,7 +4,7 @@ import tempfile
 import wave
 from pathlib import Path
 
-from audio_player import SoundDevicePlayer
+from .audio_player import SoundDevicePlayer
 
 
 def generate_sine_wave(

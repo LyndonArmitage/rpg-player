@@ -2,7 +2,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, Mock
 
-from audio_transcriber import OpenAIAudioTranscriber
+from rpg_player.audio_transcriber import OpenAIAudioTranscriber
 
 
 def test_transcribe_returns_expected_text(monkeypatch):
@@ -23,8 +23,6 @@ def test_transcribe_returns_expected_text(monkeypatch):
 
     file_path.unlink()
 
-
-def test_transcribe_async_out_streaming(monkeypatch):
     with tempfile.NamedTemporaryFile(delete=False) as tf:
         tf.write(b"dummy audio content")
         file_path = Path(tf.name)

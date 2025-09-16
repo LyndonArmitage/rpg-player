@@ -1,25 +1,20 @@
-import os
 import tempfile
 import time
 from pathlib import Path
 
+import onnxruntime as ort
 from dotenv import load_dotenv
-from elevenlabs.client import ElevenLabs
 
-from audio_player import AudioPlayer, SoundDevicePlayer
-from chat_message import ChatMessage
-from elevenlabs_voice_actor import ElevenlabsVoiceActor
-from voice_actor import VoiceActor
+from .audio_player import AudioPlayer, SoundDevicePlayer
+from .chat_message import ChatMessage
+from .piper_voice_actor import PiperVoiceActor
+from .voice_actor import VoiceActor
 
 
 def main():
-    api_key = os.getenv("ELEVENLABS_API_KEY")
-    elevenlabs = ElevenLabs(api_key=api_key)
-    voice_id = "YXpFCvM1S3JbWEJhoskW"
-    model_id = "eleven_flash_v2_5"
-    actor: VoiceActor = ElevenlabsVoiceActor(
-        "test", elevenlabs, voice_id, model_id=model_id
-    )
+    print(f"ort providers: {ort.get_available_providers()}")
+    model_path = "piper-models/en_US-lessac-medium.onnx"
+    actor: VoiceActor = PiperVoiceActor("test", model_path)
     text = "This is a test audio file."
     message: ChatMessage = ChatMessage.speech("Test", text)
 

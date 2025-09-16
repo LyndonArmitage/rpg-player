@@ -9,8 +9,8 @@ from typing import Iterable, Optional, Set, Union
 from openai import AsyncOpenAI, OpenAI
 from openai.helpers import LocalAudioPlayer
 
-from voice_actor import VoiceActor
-from chat_message import ChatMessage, MessageType
+from .voice_actor import VoiceActor
+from .chat_message import ChatMessage, MessageType
 
 log = logging.getLogger(__name__)
 

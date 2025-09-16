@@ -6,7 +6,7 @@ from typing import List, Optional, Union, override
 from jinja2 import Environment, Template
 from openai import OpenAI
 
-from chat_message import ChatMessage, ChatMessages
+from .chat_message import ChatMessage, ChatMessages
 
 
 class Agent(ABC):

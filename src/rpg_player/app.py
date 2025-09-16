@@ -19,13 +19,13 @@ from textual.logging import TextualHandler
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Label, RichLog, Rule, Switch
 
-from agent import Agent
-from audio_transcriber import AudioTranscriber, OpenAIAudioTranscriber
-from chat_message import ChatMessage
-from config import Config
-from narration_screen import NarrationScreen
-from state_machine import StateMachine
-from voice_actor import VoiceActor, VoiceActorManager
+from .agent import Agent
+from .audio_transcriber import AudioTranscriber, OpenAIAudioTranscriber
+from .chat_message import ChatMessage
+from .config import Config
+from .narration_screen import NarrationScreen
+from .state_machine import StateMachine
+from .voice_actor import VoiceActor, VoiceActorManager
 
 
 class Standby(Screen):

@@ -10,8 +10,8 @@ import onnxruntime as ort
 import sounddevice as sd
 from piper.voice import PiperVoice, SynthesisConfig
 
-from voice_actor import VoiceActor
-from chat_message import ChatMessage, MessageType
+from .voice_actor import VoiceActor
+from .chat_message import ChatMessage, MessageType
 
 log = logging.getLogger(__name__)
 

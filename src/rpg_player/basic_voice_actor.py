@@ -4,8 +4,8 @@ from typing import Iterable, Set, Union
 
 import pyttsx3
 
-from chat_message import ChatMessage, MessageType
-from voice_actor import VoiceActor
+from .chat_message import ChatMessage, MessageType
+from .voice_actor import VoiceActor
 
 log = logging.getLogger(__name__)
 

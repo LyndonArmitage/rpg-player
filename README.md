@@ -18,35 +18,63 @@ Below is a simple ASCIICast of the initial application:
 
 ## Running the App
 
-I have built this project using Python 3.13.5 and the
-[uv](https://docs.astral.sh/uv/) tool, although it should run with any Python
-virtual environment.
+This project should run in Python versions >= 3.11, but has been built and
+tested with Python 3.13.
 
-You should install/sync dependencies with:
+You should be able to run it with any virtual environment tool (venv, pipx,
+poetry, uv, etc.) but it has been build with `uv`. The repository uses a `src/`
+layout, so the recommended development workflow is to install the package in
+editable mode and use the package module to run the application.
+
+Install dependencies (two options):
+
+- Using `uv`:
 
 ```sh
 uv sync --all-groups
 ```
 
-You can then run this project with:
+- Using pip / venv (recommended for quick setup):
 
 ```sh
-uv run python app.py
-# Or if you are in the virtual environment:
-python app.py
+python -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -e .[dev]
 ```
 
-Or use textual:
+Run the application:
+
+- After editable install (recommended):
 
 ```sh
-uv run textual run app.py
-# add --dev to allow you to run with debugging like so:
-uv run textual console
-uv run textual run --dev app.py
+uv run python -m rpg_player.app
+# or with python when in virtual environment:
+python -m rpg_player.app
 ```
 
-**Note:** When running with `textual`, you will not be able to provide
-arguments as you can with the python command.
+- If you prefer to run directly from source without installing, ensure `src/`
+is on your PYTHONPATH and run the module:
+
+```sh
+PYTHONPATH=src python -m rpg_player.app
+```
+
+If you want to run with the Textual runtime, run the same module but use
+Textual as appropriate. Example using `uv`:
+
+```sh
+# Run using the Textual CLI (recommended when textual is installed).
+# After installing editable (or in your virtualenv):
+textual run rpg_player.app:MainApp
+# Or explicitly via python -m textual:
+python -m textual run rpg_player.app:MainApp
+# If you prefer to run under uv:
+uv run textual run rpg_player.app:MainApp
+# add --dev flags according to your Textual setup if required
+```
+
+### Piper models
 
 For `piper-tts` models, you can download them like so:
 
@@ -66,8 +94,9 @@ provide your OpenAI API Key via the environment variable or within this
 configuration file. Likewise, for Elevenlabs, you should provide your API key
 in the `config.json` or environment variable.
 
-See `config.py` for the configuration code data classes that are read from the
-JSON `config.json` file. Below is a simple example `config.json`:
+See `src/rpg_player/config.py` for the configuration dataclasses that are read
+from the JSON or TOML configuration file. Below is a simple example
+`config.json`:
 
 ```json
 {
@@ -125,27 +154,29 @@ JSON `config.json` file. Below is a simple example `config.json`:
 }
 ```
 
-Note that only 3 agents are currently supported in the UI. In the above
-example:
+Notes about the configuration example:
 
-- A prefix and suffix prompt have been specified, these will be used by all
-  agents
-- The path to the messages file where game state will be stored has been set
-- 3 agents have been specified with their specific names, prompts, type and
-  arguments provided
-- 2 voice actor instances have been configured, 1 for the speaker "Garry", and
-  another for both "Vex" and "Bleb"
-- Both voice actor instances are using the Piper TTS type but different models
-- The OpenAI API Key has been provided via an environment variable
+- Only three agents are currently supported in the UI.
+- A prefix and suffix prompt have been specified; these will be used by all
+  agents.
+- The path to the messages file where game state will be stored has been set.
+- Voice actors are configured with the Piper TTS type and model paths.
+- The OpenAI API Key can be provided via environment variable or in the
+  configuration file.
 
-You can also use [TOML](https://toml.io/) instead of JSON if you prefer, but
-you will have to set the configuration file with the `--config` argument, e.g.
-`--config example.toml`.
+You can also use TOML instead of JSON; pass `--config example.toml` to the
+application to load a TOML config file.
 
-## Building
+## Building / Packaging
 
-As mentioned above, I built this project using `uv` but you should be able to
-use any Python virtual environment.
+This project uses `pyproject.toml` with a `src/` layout. To work with the
+project during development, install editable with dev extras:
+
+```sh
+uv sync --group dev
+# or
+pip install -e .[dev]
+```
 
 A `requirements.txt` is automatically generated with:
 
@@ -153,8 +184,7 @@ A `requirements.txt` is automatically generated with:
 uv export --frozen --output-file=requirements.txt
 ```
 
-This file will only be used if you aren't using `uv`, e.g. using `venv` and
-`pip`.
+## Running tests
 
 To run the tests you will need to download the `piper-tts` model
 `en_US-lessac-medium`. Below is an example of how to do this:

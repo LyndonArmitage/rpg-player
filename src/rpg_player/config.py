@@ -8,12 +8,12 @@ from typing import Dict, List, Optional, Union
 from elevenlabs.client import ElevenLabs
 from openai import OpenAI
 
-from agent import Agent, OpenAIAgent
-from basic_voice_actor import BasicVoiceActor
-from elevenlabs_voice_actor import ElevenlabsVoiceActor
-from openai_voice_actor import OpenAIVoiceActor
-from piper_voice_actor import PiperVoiceActor
-from voice_actor import VoiceActor
+from .agent import Agent, OpenAIAgent
+from .basic_voice_actor import BasicVoiceActor
+from .elevenlabs_voice_actor import ElevenlabsVoiceActor
+from .openai_voice_actor import OpenAIVoiceActor
+from .piper_voice_actor import PiperVoiceActor
+from .voice_actor import VoiceActor
 
 
 @dataclass

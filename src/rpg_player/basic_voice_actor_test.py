@@ -4,10 +4,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from audio_player import AudioPlayer, SoundDevicePlayer
-from basic_voice_actor import BasicVoiceActor
-from chat_message import ChatMessage
-from voice_actor import VoiceActor
+from .audio_player import AudioPlayer, SoundDevicePlayer
+from .basic_voice_actor import BasicVoiceActor
+from .chat_message import ChatMessage
+from .voice_actor import VoiceActor
 
 
 def main():

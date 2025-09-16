@@ -1,7 +1,7 @@
 import time
 from pathlib import Path
 
-from audio_player import SoundDevicePlayer
+from rpg_player.audio_player import SoundDevicePlayer
 
 
 def test_play_and_progress(temp_wav: Path, patch_sounddevice):

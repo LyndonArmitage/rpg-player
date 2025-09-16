@@ -1,5 +1,5 @@
-from chat_message import ChatMessage
-from piper_voice_actor import PiperVoiceActor
+from rpg_player.chat_message import ChatMessage
+from rpg_player.piper_voice_actor import PiperVoiceActor
 
 TEST_MODEL_PATH = "piper-models/en_US-lessac-medium.onnx"
 

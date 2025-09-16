@@ -3,10 +3,10 @@ import logging
 from pathlib import Path
 from typing import Callable, List, Optional
 
-from agent import Agent
-from audio_player import SoundDevicePlayer
-from chat_message import ChatMessage, ChatMessages
-from voice_actor import VoiceActorManager
+from .agent import Agent
+from .audio_player import SoundDevicePlayer
+from .chat_message import ChatMessage, ChatMessages
+from .voice_actor import VoiceActorManager
 
 log = logging.getLogger(__name__)
 

@@ -11,10 +11,10 @@ from textual.logging import TextualHandler
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, Footer, Header, Label, Rule, Select, TextArea
 
-from audio_player import AudioPlayer, SoundDevicePlayer
-from chat_message import ChatMessage
-from piper_voice_actor import PiperVoiceActor
-from voice_actor import VoiceActor
+from .audio_player import AudioPlayer, SoundDevicePlayer
+from .chat_message import ChatMessage
+from .piper_voice_actor import PiperVoiceActor
+from .voice_actor import VoiceActor
 
 
 class ChooseSpeakerId(ModalScreen[str]):

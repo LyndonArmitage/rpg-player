@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from config import AgentConfig, APIKeys, Config, PromptConfig, VoiceActorConfig
+from rpg_player.config import (
+    AgentConfig,
+    APIKeys,
+    Config,
+    PromptConfig,
+    VoiceActorConfig,
+)
 
 TEST_DATA: dict = {
     "prompt_config": {

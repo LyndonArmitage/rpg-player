@@ -17,7 +17,7 @@ from typing import List, NamedTuple, Optional
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from chat_message import ChatMessage, ChatMessages, MessageType
+from .chat_message import ChatMessage, ChatMessages, MessageType
 
 log = logging.getLogger(__name__)
 
