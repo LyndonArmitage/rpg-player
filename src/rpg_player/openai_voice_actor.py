@@ -114,7 +114,6 @@ class OpenAIVoiceActor(VoiceActor):
         return True
 
     def speak_message_out_load(self, message: ChatMessage) -> None:
-
         kw = self._create_kw_dict(message)
         # Override the format to be low-latency
         kw["response_format"] = "pcm"

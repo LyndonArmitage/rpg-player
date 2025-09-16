@@ -49,7 +49,6 @@ class AudioTranscriber(ABC):
 
 
 class OpenAIAudioTranscriber(AudioTranscriber):
-
     def __init__(
         self,
         openai: OpenAI,

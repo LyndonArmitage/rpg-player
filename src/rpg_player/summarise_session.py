@@ -189,7 +189,6 @@ def summarise_summaries(
 
 
 def run_summary(client: OpenAI, text: str, instructions: str) -> str:
-
     response = client.responses.create(
         input=text,
         instructions=instructions,

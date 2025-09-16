@@ -27,7 +27,6 @@ def generate_sine_wave(
 
 
 def main():
-
     # This is a simple test to check that the sound player actually generates
     # sound, use your ears
 

@@ -29,7 +29,6 @@ from .voice_actor import VoiceActor, VoiceActorManager
 
 
 class Standby(Screen):
-
     TITLE = "RPG Party"
     SUB_TITLE = "Standby"
     CSS_PATH = "standby.tcss"
@@ -59,7 +58,7 @@ class Standby(Screen):
         with Horizontal(id="buttons"):
             yield Button("Narrate", id="narrate")
             for i, agent_name in enumerate(self.agent_names):
-                btn = Button(f"{i+1}: {agent_name}", id=f"agent{i}", classes="agent")
+                btn = Button(f"{i + 1}: {agent_name}", id=f"agent{i}", classes="agent")
                 btn.data = {"index": i, "name": agent_name}
                 yield btn
             yield Button("Random Respond", id="random")

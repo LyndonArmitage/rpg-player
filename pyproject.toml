@@ -46,7 +46,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 88
-select = ["E", "F", "W", "C", "N"]
+lint.select = ["E", "F", "W", "C", "N"]
 exclude = ["src/rpg_player/__pycache__"]
 
 [tool.setuptools.packages.find]

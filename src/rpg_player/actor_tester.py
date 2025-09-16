@@ -128,7 +128,6 @@ class VoiceActorTestApp(App):
     TITLE = "Voice Actor Test App"
 
     def on_ready(self) -> None:
-
         actors: Dict[str, VoiceActor] = {}
         actor1 = PiperVoiceActor.with_all_speaker_ids(
             "piper-models/en_US-lessac-medium.onnx"
