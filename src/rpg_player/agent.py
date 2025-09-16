@@ -180,6 +180,7 @@ class OpenAIAgent(Agent):
             )
         return ChatMessage.speech(self._name, output_text)
 
+    @staticmethod
     def _extract_text(response) -> str:
         # Prefer walking the structured output
         out = getattr(response, "output", None) or []

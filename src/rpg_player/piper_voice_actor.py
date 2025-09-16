@@ -55,7 +55,7 @@ class PiperVoiceActor(VoiceActor):
             str(model_path), use_cuda=self.supports_cuda
         )
         self.syn_config = SynthesisConfig(speaker_id=speaker_id)
-        self.speaker_map: Dict[str, int] = dict()
+        self.speaker_map: Dict[str, int] = {}
         self.number_of_speakers: int = self.voice.config.num_speakers
 
     def set_speaker_id_for(self, name: str, speaker_id: int):

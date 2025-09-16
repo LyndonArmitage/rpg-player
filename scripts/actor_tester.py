@@ -102,7 +102,7 @@ class VoiceActorScreen(Screen):
         name: str = info.get("name")
         actor: VoiceActor = self.actors[name]
         if len(actor.speaker_names) > 1:
-            speaker_names = sorted(list(actor.speaker_names))
+            speaker_names = sorted(actor.speaker_names)
             self.app.push_screen(
                 ChooseSpeakerId(speaker_names),
                 lambda result: self._after_choice(result, actor, name),
