@@ -96,14 +96,14 @@ class OpenAIAgent(Agent):
 
         if prefix_path:
             if not isinstance(prefix_path, Path):
-                prefix_path: Path = Path(prefix_path)
+                prefix_path = Path(prefix_path)
             prefix_template: Template = env.from_string(prefix_path.read_text("utf-8"))
             prefix_prompt: str = prefix_template.render(**template_vars)
             system_prompt = prefix_prompt + "\n" + system_prompt
 
         if suffix_path:
             if not isinstance(suffix_path, Path):
-                suffix_path: Path = Path(suffix_path)
+                suffix_path = Path(suffix_path)
             suffix_template: Template = env.from_string(suffix_path.read_text("utf-8"))
             suffix_prompt: str = suffix_template.render(**template_vars)
             system_prompt = system_prompt + "\n" + suffix_prompt
@@ -169,8 +169,8 @@ class OpenAIAgent(Agent):
     @override
     def respond(self, messages: ChatMessages) -> ChatMessage:
         request_msgs: List[dict] = messages.as_openai
-        response = self.openai.responses.create(
-            input=request_msgs,
+        response = self.openai.responses.create(  # pyright: ignore[reportCallIssue]
+            input=request_msgs,  # pyright: ignore[reportArgumentType]
             **self.response_kwargs,
         )
         output_text = OpenAIAgent._extract_text(response)
