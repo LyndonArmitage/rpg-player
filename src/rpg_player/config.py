@@ -157,6 +157,7 @@ class Config:
     api_keys: Optional[APIKeys] = None
     agents: List[AgentConfig] = field(default_factory=list)
     voice_actors: List[VoiceActorConfig] = field(default_factory=list)
+    text_chat_path: Optional[Path] = None
 
     @staticmethod
     def from_dict(data: dict) -> "Config":
@@ -203,6 +204,7 @@ class Config:
             ),
             agents=[parse_agent(agent) for agent in data.get("agents", [])],
             voice_actors=[parse_voice_actor(v) for v in data.get("voice_actors", [])],
+            text_chat_path=path_or_none(data.get("text_chat_path")),
         )
 
     @staticmethod

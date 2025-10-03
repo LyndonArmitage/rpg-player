@@ -6,7 +6,7 @@ import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from random import Random
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -226,6 +226,7 @@ class MainApp(App):
         if not config_path:
             config_path = Path("config.json")
         self.config_path: Path = config_path
+        self.chat_log_path: Optional[Path] = None
 
     def on_ready(self) -> None:
         config_path: Path = self.config_path
@@ -248,8 +249,15 @@ class MainApp(App):
             voice_actors.register_actor(actor)
 
         messages_path: Optional[Path] = config.messages_path
+        message_listener: Optional[Callable[[ChatMessage], None]] = None
+        if config.text_chat_path:
+            self.chat_log_path = config.text_chat_path
+            message_listener = self.append_message_to_file
         self.state_machine: StateMachine = StateMachine(
-            agents, voice_actors, messages_file=messages_path
+            agents,
+            voice_actors,
+            messages_file=messages_path,
+            message_listener=message_listener,
         )
 
         if len(self.state_machine.messages) <= 0:
@@ -265,6 +273,15 @@ class MainApp(App):
         standby = Standby(self.state_machine, transcriber)
         self.install_screen(standby, "standby")
         self.push_screen("standby")
+
+    def append_message_to_file(self, msg: ChatMessage):
+        if not self.chat_log_path:
+            return
+        with self.chat_log_path.open("a+", encoding="utf-8") as f:
+            f.seek(0, 2)  # move to end of file
+            if f.tell() > 0:  # file not empty
+                f.write("\n")
+            f.write(f"{msg.author}: {msg.content}")
 
 
 def _get_openai(config: Config) -> OpenAI:
