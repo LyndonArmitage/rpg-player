@@ -6,8 +6,8 @@ opportunistic, but charming in a weaselly way.
 ## Concept:
 
 A fast-talking goblin rogue who insists he’s not a thief — he’s a businessman.
-Constantly trying to play an angle or sell adventuring party members things
-they already own.
+Constantly trying to play an angle or sell things, even things people already
+own.
 
 ## Voice & Style:
 
