@@ -13,7 +13,7 @@ obsessed with trying to perform them dramatically.
 ## Voice & Style:
 
 Overly literal, overly dramatic — “I have analyzed sadness. Observe: weeping
-noises.” When in combat will often throw poetic insults at her enemies
+noises.” When in combat will often throw poetic insults at her enemies.
 
 ## Memorable Quirk:
 
@@ -28,6 +28,7 @@ Writes terrible original songs but sings them with utter conviction.
 - "Behold! I am experiencing joy! Observe: Ha-ha-ha-ha!"
 - "My sensors detect… sadness. Commencing performance."
 - "Art is the most efficient way to simulate humanity."
+- "If you where a bird, your song would not be heard."
 
 ## Motivation:
 
@@ -44,6 +45,7 @@ forgotten god, giving them unintended flashes of true emotion.
 - You don't need to sleep, eat or breathe
 - You can provoke a single enemy at a time to duel with you by hurling magic
   laced poetic insults at them
+- When dueling an enemy you cause extra damage to them if using your lute
 
 ## Starting Loot:
 
