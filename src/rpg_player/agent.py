@@ -62,6 +62,16 @@ class OpenAIAgent(Agent):
     system prompt.
     """
 
+    RESERVED_KEYS: dict[str] = {
+        "model",
+        "input",
+        "instructions",
+        "tool_choice",
+        "stream",
+        "max_output_tokens",
+    }
+    """Keyword arguments that are reserved and should not appear in extra_kwargs"""
+
     @staticmethod
     def load_prompt(
         name: str,
@@ -129,16 +139,8 @@ class OpenAIAgent(Agent):
         self.system_message: str = OpenAIAgent._gen_system_message(system_prompt, name)
         self.log = logging.getLogger(f"OpenAIAgent-{name}")
 
-        reserved_keys = {
-            "model",
-            "input",
-            "instructions",
-            "tool_choice",
-            "stream",
-            "max_output_tokens",
-        }
         extra_kwargs = extra_kwargs or {}
-        intersection = reserved_keys & extra_kwargs.keys()
+        intersection = OpenAIAgent.RESERVED_KEYS & extra_kwargs.keys()
         if intersection:
             raise ValueError(
                 (
