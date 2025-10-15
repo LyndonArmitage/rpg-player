@@ -98,13 +98,6 @@ def main():
         help="The path to the output messages file.",
         type=Path,
     )
-    parser.add_argument(
-        "--config",
-        help="The path to an optional config file for more precise configuration",
-        required=False,
-        dest="config_path",
-        type=Path,
-    )
 
     args = parser.parse_args()
 
