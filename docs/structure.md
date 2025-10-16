@@ -58,7 +58,7 @@ The `OpenAIVoiceActor` class uses OpenAI APIs and allows for optional
 instructions as part of its input. [OpenAI.fm](https://www.openai.fm/) has
 examples of how instructions and voices work together. Sufficed to say, the
 instructions can control the general _vibe_ of a voice including tone, dialect,
-pronunciation and features. Generally, you should align this with your agent's
+pronunciations and features. Generally, you should align this with your agent's
 prompt for a satisfying voice experience. `OpenAIVoiceActor` supports streaming
 audio, avoiding the need for storing intermediate files.
 
@@ -110,6 +110,21 @@ control how the agent responds. You may want to exaggerate characteristics
 somewhat in order for them to be more apparent, likewise, you'll want to
 indicate how they should speak and request that they limit their output to a
 few sentences at most.
+
+`OllamaAgent` is a work-in-progress implementation that uses the `ollama`
+Python library to allow you to use local LLM instances instead of cloud based
+models. Caution should be taken with using models downloaded from the internet
+as they can be of questionable quality, and some can have less well defined
+safety mechanisms in place. Generally, popular open-source models from
+reputable contributors don't have these issues. The `OllamaAgent` is given an
+Ollama client object, which means you can point it at an online instance of the
+Ollama API if desired, so you don't need to host the app on the same system as
+the LLM model.
+
+When mixing different kinds of agents and models, be aware that newer OpenAI
+models support a "developer" role instead of a "system" role. The application
+will try to switch to this if all agents are using some form of `gpt-5` but if
+not, it will default to the "system" role for system style messages.
 
 ### AudioTranscriber
 
@@ -170,6 +185,17 @@ This tool is part of the main application and useable by something like:
 ```sh
 uv run python -m rpg_player.summarise_session
 ```
+
+You can control the model used with `--model` for example: `--model gpt-5-mini`
+
+You can run in a "dryrun" mode with `--dryrun`. Currently all this does is
+count the number of total tokens in the current context.
+
+The summariser will spit out the summary to your standard output as well as a
+count of tokens in versus tokens in the generated summary.
+
+The running summary may get longer the more you play, but it should remain
+shorter than what the combined context would be overall.
 
 ### Voice Actor Testing
 
