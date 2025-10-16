@@ -23,7 +23,7 @@ from .agent import Agent, OpenAIAgent
 from .audio_transcriber import AudioTranscriber, OpenAIAudioTranscriber
 from .chat_message import ChatMessage
 from .config import Config
-from .message_transfomer import ChatMessageTransformer, RemovePrefixMessageTransformer
+from .message_transformer import ChatMessageTransformer, RemovePrefixMessageTransformer
 from .narration_screen import NarrationScreen
 from .state_machine import StateMachine
 from .voice_actor import VoiceActor, VoiceActorManager

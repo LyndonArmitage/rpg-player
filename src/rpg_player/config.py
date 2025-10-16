@@ -13,6 +13,7 @@ from .basic_voice_actor import BasicVoiceActor
 from .elevenlabs_voice_actor import ElevenlabsVoiceActor
 from .openai_voice_actor import OpenAIVoiceActor
 from .piper_voice_actor import PiperVoiceActor
+from .prompt_parser import PromptParser
 from .voice_actor import VoiceActor
 
 
@@ -79,14 +80,15 @@ class AgentConfig:
             k: v for k, v in self.args.items() if k not in OpenAIAgent.RESERVED_KEYS
         }
 
-        return OpenAIAgent.load_prompt(
-            self.name,
+        prompt_parser = PromptParser({"name": self.name, "model": model})
+        prompt_text: str = prompt_parser.parse_prompt_paths(
             self.prompt_path,
-            openai_client,
-            model=model,
-            prefix_path=prompt_config.prefix_path,
-            suffix_path=prompt_config.suffix_path,
-            extra_kwargs=extra_kwargs,
+            prompt_config.prefix_path,
+            prompt_config.suffix_path,
+        )
+
+        return OpenAIAgent(
+            openai_client, self.name, prompt_text, model, extra_kwargs=extra_kwargs
         )
 
 

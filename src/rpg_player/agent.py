@@ -1,13 +1,11 @@
 import logging
 from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import List, Optional, Union, override
+from typing import List, Optional, override
 
 from ollama import Client
 from openai import OpenAI
 
 from .chat_message import ChatMessage, ChatMessages
-from .prompt_parser import PromptParser
 
 
 class Agent(ABC):
@@ -72,34 +70,6 @@ class OpenAIAgent(Agent):
         "max_output_tokens",
     }
     """Keyword arguments that are reserved and should not appear in extra_kwargs"""
-
-    @staticmethod
-    def load_prompt(
-        name: str,
-        path: Union[Path, str],
-        openai: OpenAI,
-        model: str = "gpt-4.1",
-        max_tokens: int = 3000,
-        prefix_path: Optional[Union[Path, str]] = None,
-        suffix_path: Optional[Union[Path, str]] = None,
-        extra_kwargs: Optional[dict] = None,
-    ) -> "OpenAIAgent":
-        """
-        Create an agent, loading the prompt from a file.
-
-        Optionally can load a prefix prompt and suffix prompt which will be
-        added before and after the main prompt respectively.
-        """
-        template_vars: dict = {
-            "name": name,
-            "model": model,
-        }
-        parser = PromptParser(template_vars)
-        system_prompt: str = parser.parse_prompt_paths(path, prefix_path, suffix_path)
-
-        return OpenAIAgent(
-            openai, name, system_prompt, model, max_tokens, extra_kwargs=extra_kwargs
-        )
 
     def __init__(
         self,
