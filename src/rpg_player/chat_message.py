@@ -71,8 +71,17 @@ class ChatMessages:
     This will contain all messages sent during a session.
     """
 
-    @staticmethod
-    def convert_to_openai(message: ChatMessage) -> dict:
+    def convert_to_openai(self, message: ChatMessage) -> dict[str, str]:
+        """
+        Convert the given message to an OpenAI friendly format.
+
+        The format looks like:
+            `{ "role": "system", "content": "content data" }`
+
+        This will use the configured system role for this instance, normally
+        this is "system" but it could be "developer" or anything else depending
+        on the models used.
+        """
         msg_author: str = message.author
         role = "assistant"
         match message.type:
@@ -81,7 +90,7 @@ class ChatMessages:
             case MessageType.NARRATION:
                 role = "user"
             case MessageType.SYSTEM:
-                role = "developer"
+                role = self.system_role
             case MessageType.SUMMARY:
                 role = "assistant"
                 if msg_author == "DM" or msg_author == "GM":
@@ -107,9 +116,10 @@ class ChatMessages:
                 loaded_messages.append(message)
         return loaded_messages
 
-    def __init__(self):
+    def __init__(self, system_role: str = "developer"):
+        self.system_role: str = system_role
         self.messages: List[ChatMessage] = []
-        # This is to reduce the creation of OpenAI style messages
+        # This is to cache the creation of OpenAI style messages
         self._openai_messages: List[dict] = []
 
     def __len__(self) -> int:
@@ -125,7 +135,7 @@ class ChatMessages:
 
     def append(self, message: ChatMessage):
         self.messages.append(message)
-        openai_msg = ChatMessages.convert_to_openai(message)
+        openai_msg = self.convert_to_openai(message)
         self._openai_messages.append(openai_msg)
 
     def extend(self, messages: Iterable[ChatMessage]):

@@ -19,7 +19,7 @@ from textual.logging import TextualHandler
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Label, RichLog, Rule, Switch
 
-from .agent import Agent
+from .agent import Agent, OpenAIAgent
 from .audio_transcriber import AudioTranscriber, OpenAIAudioTranscriber
 from .chat_message import ChatMessage
 from .config import Config
@@ -239,9 +239,21 @@ class MainApp(App):
         agents: List[Agent] = []
         # TODO: Make this neater
         openai: OpenAI = _get_openai(config)
+        gpt_models: set[str] = set()
+        only_using_openai: bool = True
         for agent_conf in config.agents:
             agent = agent_conf.create_agent(config.prompt_config, openai=openai)
             agents.append(agent)
+            if isinstance(agent, OpenAIAgent):
+                gpt_models.add(agent.model)
+            else:
+                only_using_openai = False
+
+        # Set up the system role, since some models use a different role name
+        system_role: str = "system"
+        # Set system role to developer if all models are gpt-5 or more
+        if only_using_openai and all(m.startswith("gpt-5") for m in gpt_models):
+            system_role = "developer"
 
         voice_actors: VoiceActorManager = VoiceActorManager()
         for actor_config in config.voice_actors:
@@ -258,6 +270,7 @@ class MainApp(App):
             voice_actors,
             messages_file=messages_path,
             message_listener=message_listener,
+            system_role=system_role,
         )
 
         if len(self.state_machine.messages) <= 0:

@@ -975,6 +975,19 @@ wheels = [
 ]
 
 [[package]]
+name = "ollama"
+version = "0.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d6/47/f9ee32467fe92744474a8c72e138113f3b529fc266eea76abfdec9a33f3b/ollama-0.6.0.tar.gz", hash = "sha256:da2b2d846b5944cfbcee1ca1e6ee0585f6c9d45a2fe9467cbcd096a37383da2f", size = 50811, upload-time = "2025-09-24T22:46:02.417Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b5/c1/edc9f41b425ca40b26b7c104c5f6841a4537bb2552bfa6ca66e81405bb95/ollama-0.6.0-py3-none-any.whl", hash = "sha256:534511b3ccea2dff419ae06c3b58d7f217c55be7897c8ce5868dfb6b219cf7a0", size = 14130, upload-time = "2025-09-24T22:46:01.19Z" },
+]
+
+[[package]]
 name = "onnxruntime"
 version = "1.22.1"
 source = { registry = "https://pypi.org/simple" }
@@ -4250,6 +4263,7 @@ source = { editable = "." }
 dependencies = [
     { name = "elevenlabs" },
     { name = "jinja2" },
+    { name = "ollama" },
     { name = "openai" },
     { name = "piper-tts" },
     { name = "python-dotenv" },
@@ -4276,6 +4290,7 @@ dev = [
 requires-dist = [
     { name = "elevenlabs", specifier = ">=2.15.0" },
     { name = "jinja2", specifier = ">=3.1.6" },
+    { name = "ollama", specifier = ">=0.6.0" },
     { name = "openai", specifier = ">=1.99.9" },
     { name = "piper-tts", specifier = ">=1.3.0" },
     { name = "python-dotenv", specifier = ">=1.1.1" },

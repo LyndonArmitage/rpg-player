@@ -40,8 +40,9 @@ class StateMachine:
         message_listener: Optional[Callable[[ChatMessage], None]] = None,
         messages_file: Optional[Path] = None,
         delete_audio: bool = True,
+        system_role: str = "developer",
     ):
-        self.messages: ChatMessages = ChatMessages()
+        self.messages: ChatMessages = ChatMessages(system_role)
         self.agents: List[Agent] = agents
         self.voice_actors: VoiceActorManager = voice_actors
         self.player: SoundDevicePlayer = SoundDevicePlayer()
