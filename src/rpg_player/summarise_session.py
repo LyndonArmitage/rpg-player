@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from .chat_message import ChatMessage, ChatMessages, MessageType
+from .token_counter import TiktokenTokenCounter, TokenCounter
 
 log = logging.getLogger(__name__)
 
@@ -99,23 +100,46 @@ def main():
         type=Path,
     )
 
+    parser.add_argument(
+        "--model",
+        help="The OpenAI model to use.",
+        default="gpt-5",
+        type=str,
+    )
+
+    parser.add_argument(
+        "--dryrun",
+        help="whether to run as a dryrun or not",
+        action="store_true",
+    )
+
     args = parser.parse_args()
 
     openai_client: OpenAI = _get_openai(args)
 
     input_path: Path = args.input_path
     output_path: Path = args.output_path
+    model: str = args.model
+    dryrun: bool = args.dryrun
 
     # Load the messages
-    messages: ChatMessages = _load_messages(input_path)
+    messages: ChatMessages = _load_messages(input_path, model)
+
+    token_counter: TokenCounter = _get_token_counter(model)
+    # Count the tokens so we can evaluate how well we shrink the context
+    counted_tokens: int = token_counter.count_total(messages)
+    print(f"Found {counted_tokens} raw tokens")
 
     # Find existing summaries
     existing_summaries: List[ChatMessage] = messages.filter_type(MessageType.SUMMARY)
 
+    if dryrun:
+        print("Stopping in dryrun mode")
+        return
     # TODO: Summaries for specific agents
 
     summaries: Summaries = generate_summaries(
-        openai_client, messages, existing_summaries
+        openai_client, model, messages, existing_summaries
     )
 
     combined_summary: str = (
@@ -130,8 +154,15 @@ def main():
         f.write(json.dumps(summary_message.to_dict()))
         f.write("\n")
 
+    summary_tokens: int = token_counter.count(summary_message)
+    print(f"Original token count {counted_tokens} vs summary count {summary_tokens}")
 
-def summarise_session(client: OpenAI, messages: ChatMessages) -> str:
+
+def _get_token_counter(model: str) -> TokenCounter:
+    return TiktokenTokenCounter(model)
+
+
+def summarise_session(client: OpenAI, model: str, messages: ChatMessages) -> str:
     """
     Summarise the session so far, ignoring other summary messages
     """
@@ -151,25 +182,28 @@ def summarise_session(client: OpenAI, messages: ChatMessages) -> str:
         raise ValueError("No messages to summarise")
     log.info(f"Summarising transcript of {msg_count} messages")
 
-    summary: str = run_summary(client, transcript, SESSION_SUMMARY_PROMPT)
+    summary: str = run_summary(client, model, transcript, SESSION_SUMMARY_PROMPT)
     return summary
 
 
 def generate_summaries(
-    client: OpenAI, messages: ChatMessages, existing_summaries: List[ChatMessage]
+    client: OpenAI,
+    model: str,
+    messages: ChatMessages,
+    existing_summaries: List[ChatMessage],
 ) -> Summaries:
     """
     Summarise the current session as well as create an ongoing summary
     """
-    session_summary: str = summarise_session(client, messages)
+    session_summary: str = summarise_session(client, model, messages)
     overall_summary: str = summarise_summaries(
-        client, existing_summaries, session_summary
+        client, model, existing_summaries, session_summary
     )
     return Summaries(session_summary, overall_summary)
 
 
 def summarise_summaries(
-    client: OpenAI, existing_summaries: List[ChatMessage], last_session: str
+    client: OpenAI, model: str, existing_summaries: List[ChatMessage], last_session: str
 ) -> str:
     """
     Take all the previous summaries and the current summary and generate a
@@ -178,14 +212,14 @@ def summarise_summaries(
     summary_texts: List[str] = [msg.content.strip() for msg in existing_summaries]
     summary_texts.append(last_session)
     text = "\n---\n".join(summary_texts).strip()
-    return run_summary(client, text, RUNNING_SUMMARY_PROMPT)
+    return run_summary(client, model, text, RUNNING_SUMMARY_PROMPT)
 
 
-def run_summary(client: OpenAI, text: str, instructions: str) -> str:
+def run_summary(client: OpenAI, model: str, text: str, instructions: str) -> str:
     response = client.responses.create(
         input=text,
         instructions=instructions,
-        model="gpt-5-mini",
+        model=model,
     )
 
     # Depending on model the output can be slightly different
@@ -211,11 +245,14 @@ def format_message(msg: ChatMessage) -> str:
     return line
 
 
-def _load_messages(path: Path) -> ChatMessages:
+def _load_messages(path: Path, model: str) -> ChatMessages:
     log.info(f"Loading messages from {path}")
     loaded: List[ChatMessage] = ChatMessages.load_messages_from_file(path)
     count: int = len(loaded)
-    msgs = ChatMessages()
+    system_role: str = "system"
+    if model.startswith("gpt-5"):
+        system_role = "developer"
+    msgs = ChatMessages(system_role)
     msgs.extend(loaded)
     log.info(f"Loaded {count} messages")
     return msgs
