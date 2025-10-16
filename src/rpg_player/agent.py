@@ -3,11 +3,11 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional, Union, override
 
-from jinja2 import Environment, Template
 from ollama import Client
 from openai import OpenAI
 
 from .chat_message import ChatMessage, ChatMessages
+from .prompt_parser import PromptParser
 
 
 class Agent(ABC):
@@ -90,37 +90,12 @@ class OpenAIAgent(Agent):
         Optionally can load a prefix prompt and suffix prompt which will be
         added before and after the main prompt respectively.
         """
-        if not isinstance(path, Path):
-            path = Path(path)
-        if not path.exists():
-            raise FileNotFoundError(f"{path} does not exist")
-
-        # TODO: Extract the prompt parsing to its own location so it can be
-        # shared between different agent types
-
-        # Create jinja environment and template variables to use
-        env = Environment()
         template_vars: dict = {
             "name": name,
             "model": model,
         }
-
-        system_prompt_template: Template = env.from_string(path.read_text("utf-8"))
-        system_prompt: str = system_prompt_template.render(**template_vars)
-
-        if prefix_path:
-            if not isinstance(prefix_path, Path):
-                prefix_path = Path(prefix_path)
-            prefix_template: Template = env.from_string(prefix_path.read_text("utf-8"))
-            prefix_prompt: str = prefix_template.render(**template_vars)
-            system_prompt = prefix_prompt + "\n" + system_prompt
-
-        if suffix_path:
-            if not isinstance(suffix_path, Path):
-                suffix_path = Path(suffix_path)
-            suffix_template: Template = env.from_string(suffix_path.read_text("utf-8"))
-            suffix_prompt: str = suffix_template.render(**template_vars)
-            system_prompt = system_prompt + "\n" + suffix_prompt
+        parser = PromptParser(template_vars)
+        system_prompt: str = parser.parse_prompt_paths(path, prefix_path, suffix_path)
 
         return OpenAIAgent(
             openai, name, system_prompt, model, max_tokens, extra_kwargs=extra_kwargs
