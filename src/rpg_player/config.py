@@ -74,9 +74,9 @@ class AgentConfig:
     ) -> OpenAIAgent:
         args: dict = {**self.args, **kwargs}
         model: str = args.get("model", "gpt-5-mini")
-        # Take args and create a copy without the reserved keys in it
+        # Take self.args and create a copy without the reserved keys in it
         extra_kwargs = {
-            k: v for k, v in args.items() if k not in OpenAIAgent.RESERVED_KEYS
+            k: v for k, v in self.args.items() if k not in OpenAIAgent.RESERVED_KEYS
         }
 
         return OpenAIAgent.load_prompt(
