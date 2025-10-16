@@ -6,6 +6,7 @@ from typing import Callable, List, Optional
 from .agent import Agent
 from .audio_player import SoundDevicePlayer
 from .chat_message import ChatMessage, ChatMessages
+from .message_transformer import ChatMessageTransformer
 from .voice_actor import VoiceActorManager
 
 log = logging.getLogger(__name__)
@@ -41,11 +42,13 @@ class StateMachine:
         messages_file: Optional[Path] = None,
         delete_audio: bool = True,
         system_role: str = "developer",
+        message_transformer: Optional[ChatMessageTransformer] = None,
     ):
         self.messages: ChatMessages = ChatMessages(system_role)
         self.agents: List[Agent] = agents
         self.voice_actors: VoiceActorManager = voice_actors
         self.player: SoundDevicePlayer = SoundDevicePlayer()
+        self.message_transformer: Optional[ChatMessageTransformer] = message_transformer
         if delete_audio:
 
             def delete_path(path: Path):
@@ -108,6 +111,9 @@ class StateMachine:
             )
         agent: Agent = self.agents[index]
         response: ChatMessage = agent.respond(self.messages)
+        # Transformer an agent response if needed
+        if self.message_transformer:
+            response = self.message_transformer.transform(response)
         # Add the message to our container
         self.add_message(response)
         return response

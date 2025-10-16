@@ -23,6 +23,7 @@ from .agent import Agent, OpenAIAgent
 from .audio_transcriber import AudioTranscriber, OpenAIAudioTranscriber
 from .chat_message import ChatMessage
 from .config import Config
+from .message_transfomer import ChatMessageTransformer, RemovePrefixMessageTransformer
 from .narration_screen import NarrationScreen
 from .state_machine import StateMachine
 from .voice_actor import VoiceActor, VoiceActorManager
@@ -265,12 +266,15 @@ class MainApp(App):
         if config.text_chat_path:
             self.chat_log_path = config.text_chat_path
             message_listener = self.append_message_to_file
+        # TODO: Add transformer to config
+        msg_transformer: ChatMessageTransformer = RemovePrefixMessageTransformer()
         self.state_machine: StateMachine = StateMachine(
             agents,
             voice_actors,
             messages_file=messages_path,
             message_listener=message_listener,
             system_role=system_role,
+            message_transformer=msg_transformer,
         )
 
         if len(self.state_machine.messages) <= 0:
