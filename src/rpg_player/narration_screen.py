@@ -21,6 +21,7 @@ from .chat_message import ChatMessages
 @dataclass
 class TranscriptionChunk:
     text: str
+    is_done: bool
 
 
 class NarrationScreen(Screen):
@@ -163,7 +164,7 @@ class NarrationScreen(Screen):
 
         def stream_handler(file: Path, text: str, done: bool) -> None:
             try:
-                coro = self._append_transcription(TranscriptionChunk(text))
+                coro = self._append_transcription(TranscriptionChunk(text, done))
                 # Schedule coroutine safely on the main loop
                 loop.call_soon_threadsafe(lambda: asyncio.create_task(coro))
             except Exception:
@@ -185,7 +186,7 @@ class NarrationScreen(Screen):
                     text = await asyncio.to_thread(
                         self.transcriber.transcribe, audio_path
                     )
-                    await self._append_transcription(TranscriptionChunk(text))
+                    await self._append_transcription(TranscriptionChunk(text, True))
                 except Exception as e:
                     self._set_status(f"Transcription failed: {e}")
 
@@ -207,8 +208,12 @@ class NarrationScreen(Screen):
     async def _append_transcription(self, chunk: TranscriptionChunk) -> None:
         editor = self.query_one(TextArea)
         current = editor.text or ""
-        prefix = "\n" if current and not current.endswith("\n") else ""
-        editor.text = f"{current}{prefix}{chunk.text}"
+        if chunk.is_done:
+            # replace all text with final output
+            editor.text = chunk.text
+        else:
+            # append text
+            editor.text = f"{current}{chunk.text}"
         editor.cursor_location = (
             editor.document.end
         )  # move caret to end; TextArea auto-scrolls when cursor/selection changes
