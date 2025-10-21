@@ -15,6 +15,9 @@ class AudioTranscriber(ABC):
     from
 
     The transcription should just be what was spoken with no timestamps.
+
+    AudioTranscriber's can optionally support streaming output as soon as it is
+    available.
     """
 
     @abstractmethod
@@ -49,16 +52,38 @@ class AudioTranscriber(ABC):
 
 
 class OpenAIAudioTranscriber(AudioTranscriber):
+    """
+    OpenAI Based Audio Transcriber.
+
+    This class uses the OpenAI API for transcription.
+
+    You can choose from the following models:
+        - whisper-1
+        - gpt-4o-transcribe
+        - gpt-4o-mini-transcribe
+
+    `whisper-1` is the quickest model by far but it does not support async
+    output or prompting.
+
+    `gpt-4o-transcribe` is the best model, and matches `whisper-1` in terms of
+    price, but may take longer to transcribe.
+
+    `gpt-4o-mini-transcribe` is the cheapeast model. It's not the most accurate
+     and is likely the slowest, but it will cost half the cost of the others.
+
+     It's recommended that you choose either `whisper-1` or `gpt-4o-transcribe`.
+    """
+
     def __init__(
         self,
         openai: OpenAI,
-        model: str = "whisper-1",
+        model: str = "gpt-4o-transcribe",
         language: str = "en",
         extra_kwargs: Optional[dict] = None,
     ):
         """
         :param openai: OpenAI SDK client
-        :param model: Name of Whisper model to use (default: "whisper-1")
+        :param model: Name of model to use (default: "gpt-4o-transcribe")
         :param language: Language name, should be 2 character code (default: "en")
         :param extra_kwargs: Extra keyword arguments for transcription API call
         """
@@ -78,6 +103,17 @@ class OpenAIAudioTranscriber(AudioTranscriber):
             )
         # All parameters that will be passed to API
         self.transcription_kwargs = {"model": model, "language": language}
+
+        if "prompt" not in extra_kwargs:
+            # Setup a prompt based on the model used
+            match model:
+                case "gpt-4o-transcribe" | "gpt-4o-mini-transcribe":
+                    prompt = (
+                        "The following is narration from a Dungeon/Game Master "
+                        "for a traditional tabletop role playing game."
+                    )
+                    self.transcription_kwargs["prompt"] = prompt
+                # TODO: Add branches for other model prompts
         self.transcription_kwargs.update(extra_kwargs)
 
     @override
