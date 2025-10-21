@@ -6,7 +6,7 @@ import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from random import Random
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -286,7 +286,18 @@ class MainApp(App):
             )
             self.state_machine.add_message(intro_players_msg)
 
-        transcriber: AudioTranscriber = OpenAIAudioTranscriber(openai)
+        extra_transcriber_kwargs: dict[str, Any] = {
+            "prompt": (
+                "The following is narration from a Dungeon/Game Master "
+                "for a traditional tabletop role playing game. "
+                "Player character names are:"
+                "\n- "
+                "\n- ".join([a.name for a in agents])
+            )
+        }
+        transcriber: AudioTranscriber = OpenAIAudioTranscriber(
+            openai, extra_kwargs=extra_transcriber_kwargs
+        )
         standby = Standby(self.state_machine, transcriber)
         self.install_screen(standby, "standby")
         self.push_screen("standby")
