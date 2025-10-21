@@ -208,10 +208,10 @@ class NarrationScreen(Screen):
     async def _append_transcription(self, chunk: TranscriptionChunk) -> None:
         editor = self.query_one(TextArea)
         current = editor.text or ""
-        if chunk.is_done:
+        if chunk.is_done and current == "":
             # replace all text with final output
             editor.text = chunk.text
-        else:
+        elif not chunk.is_done:
             # append text
             editor.text = f"{current}{chunk.text}"
         editor.cursor_location = (
