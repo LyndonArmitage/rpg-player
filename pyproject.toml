@@ -23,8 +23,6 @@ dependencies = [
 dev = [
   "basedpyright>=1.40.0",
   "black>=26.5.1",
-  "flake8-bugbear>=24.12.12",
-  "flake8>=7.3.0",
   "isort>=5.12.0",
   "prek>=0.5.2",
   "pytest>=8.4.1",
@@ -36,20 +34,34 @@ dev = [
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.black]
-line-length = 88
+[tool.uv]
+cache-dir = ".uv-cache"
 
 [tool.isort]
 profile = "black"
 
-[tool.pytest.ini_options]
+[tool.black]
+line-length = 88
+target-version = ["py313"]
+
+[tool.pytest]
+addopts = ["-ra", "-q"]
+minversion = "9.0"
 pythonpath = ["src"]
 testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 88
-lint.select = ["E", "F", "W", "C", "N"]
-exclude = ["src/rpg_player/__pycache__"]
+extend-exclude = ["typings"]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "I"]
+ignore = ["E501"]
+unfixable = ["B"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402"]
+"**/{tests,docs,tools}/*" = ["E402"]
+
+[tool.ruff.format]
+quote-style = "double"
