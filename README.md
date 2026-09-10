@@ -21,60 +21,32 @@ Below is a simple ASCIICast of the initial application:
 This project should run in Python versions >= 3.11, but has been built and
 tested with Python 3.13.
 
-You should be able to run it with any virtual environment tool (venv, pipx,
-poetry, uv, etc.) but it has been build with `uv`. The repository uses a `src/`
-layout, so the recommended development workflow is to install the package in
-editable mode and use the package module to run the application.
+It has been built using [uv](https://docs.astral.sh/uv/).
+But it may work with other virtual environment tools.
 
-Install dependencies (two options):
+The repository uses a `src/` layout.
 
-- Using `uv`:
+You can install dependencies using `uv`:
 
 ```sh
 uv sync --all-groups
 ```
 
-- Using pip / venv (recommended for quick setup):
-
-```sh
-python -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -e .[dev]
-```
-
-Run the application:
-
-- After editable install (recommended):
+Running the application can be done using `uv` directly:
 
 ```sh
 uv run python -m rpg_player.app
-# or with python when in virtual environment:
-python -m rpg_player.app
-```
-
-- If you prefer to run directly from source without installing, ensure `src/`
-is on your PYTHONPATH and run the module:
-
-```sh
-PYTHONPATH=src python -m rpg_player.app
 ```
 
 If you want to run with the Textual runtime, run the same module but use
 Textual as appropriate. Example using `uv`:
 
 ```sh
-# Run using the Textual CLI (recommended when textual is installed).
-# After installing editable (or in your virtualenv):
-textual run rpg_player.app:MainApp
-# Or explicitly via python -m textual:
-python -m textual run rpg_player.app:MainApp
-# If you prefer to run under uv:
 uv run textual run rpg_player.app:MainApp
 # add --dev flags according to your Textual setup if required
 ```
 
-### Piper models
+### Piper Text-to-Speech Models
 
 For `piper-tts` models, you can download them like so:
 
@@ -178,21 +150,19 @@ uv run python -m rpg_player.app --config games/config.toml
 ## Building / Packaging
 
 This project uses `pyproject.toml` with a `src/` layout. To work with the
-project during development, install editable with dev extras:
+project during development:
 
 ```sh
 uv sync --group dev
-# or
-pip install -e .[dev]
 ```
 
-A `requirements.txt` is automatically generated with:
+## Running Tests
+
+Tests should be run by using `uv` specifically:
 
 ```sh
-uv export --frozen --output-file=requirements.txt
+uv run pytest
 ```
-
-## Running tests
 
 To run the tests you will need to download the `piper-tts` model
 `en_US-lessac-medium`. Below is an example of how to do this:
