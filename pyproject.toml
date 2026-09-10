@@ -3,7 +3,7 @@ name = "rpg-player"
 version = "0.1.0"
 description = "A small toy project for playing & narrating RPG-style messages"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 authors = [{ name = "Lyndon Armitage" }]
 dependencies = [
   "elevenlabs>=2.15.0",
@@ -21,13 +21,14 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-  "black>=25.1.0",
+  "basedpyright>=1.40.0",
+  "black>=26.5.1",
   "flake8-bugbear>=24.12.12",
   "flake8>=7.3.0",
   "isort>=5.12.0",
   "prek>=0.5.2",
   "pytest>=8.4.1",
-  "ruff>=0.12.0",
+  "ruff>=0.16.6",
   "textual-dev>=1.7.0",
 ]
 

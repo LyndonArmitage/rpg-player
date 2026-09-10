@@ -1,0 +1,71 @@
+[[repos]]
+repo = "https://github.com/pre-commit/pre-commit-hooks"
+rev = "v6.0.0"
+
+[[repos.hooks]]
+id = "check-ast"
+
+[[repos.hooks]]
+id = "check-case-conflict"
+
+[[repos.hooks]]
+id = "check-illegal-windows-names"
+
+[[repos.hooks]]
+id = "end-of-file-fixer"
+
+[[repos.hooks]]
+id = "trailing-whitespace"
+
+[[repos.hooks]]
+id = "check-json"
+
+[[repos.hooks]]
+id = "check-yaml"
+
+[[repos.hooks]]
+id = "check-toml"
+
+[[repos.hooks]]
+id = "check-added-large-files"
+
+[[repos.hooks]]
+id = "detect-private-key"
+
+[[repos.hooks]]
+id = "check-executables-have-shebangs"
+
+[[repos]]
+repo = "https://github.com/psf/black"
+rev = "26.5.1"
+
+[[repos.hooks]]
+id = "black"
+language_version = "python3.13"
+
+[[repos]]
+repo = "https://github.com/astral-sh/ruff-pre-commit"
+rev = "v0.16.6"
+
+[[repos.hooks]]
+id = "ruff-check"
+
+[[repos]]
+repo = "https://github.com/DetachHead/basedpyright-prek-mirror"
+rev = "1.40.0"
+
+[[repos.hooks]]
+id = "basedpyright"
+
+# Below are local repository hooks
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "pytest-test-change"
+name = "pytest test change"
+description = "Runs pytests on test changes"
+language = "system"
+entry = "uv run --isolated pytest"
+pass_filenames = true
+files = "tests\\/test_.+\\.py"

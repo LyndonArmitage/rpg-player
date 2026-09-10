@@ -1,3 +1,15 @@
 {
-  "typeCheckingMode": "off"
+  "pythonVersion": "3.13",
+  "typeCheckingMode": "recommended",
+  "venvPath": ".",
+  "venv": ".venv",
+  "stubPath": "typings",
+  "allowedUntypedLibraries": [],
+  "include": [
+    "src",
+    "tests"
+  ],
+  "exclude": [
+    "**/__pycache__"
+  ]
 }

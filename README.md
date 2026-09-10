@@ -18,13 +18,15 @@ Below is a simple ASCIICast of the initial application:
 
 ## Running the App
 
-This project should run in Python versions >= 3.11, but has been built and
-tested with Python 3.13.
+This project should run in Python versions >= 3.13.
 
 It has been built using [uv](https://docs.astral.sh/uv/).
 But it may work with other virtual environment tools.
 
 The repository uses a `src/` layout.
+
+There is more detailed documentation in the `docs/` folder related to testing,
+code quality and the structure of the application
 
 You can install dependencies using `uv`:
 
@@ -172,6 +174,3 @@ mkdir piper-models
 cd piper-models
 uv run python -m piper.download_voices en_US-lessac-medium
 ```
-
-For more documentation, see the [docs/](docs/) folder. Specifically
-[docs/structure.md](/docs/structure.md).
