@@ -2,7 +2,6 @@
 import logging
 import tempfile
 from pathlib import Path
-from typing import Dict, List
 
 from dotenv import load_dotenv
 from textual import on
@@ -13,9 +12,9 @@ from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, Footer, Header, Label, Rule, Select, TextArea
 
 from rpg_player.audio_player import AudioPlayer, SoundDevicePlayer
-from rpg_player.chat_message import ChatMessage
-from rpg_player.piper_voice_actor import PiperVoiceActor
-from rpg_player.voice_actor import VoiceActor
+from rpg_player.domain.chat_message import ChatMessage
+from rpg_player.domain.voice_actor import OutLoudVoiceActor, VoiceActor
+from rpg_player.voice.piper import PiperVoiceActor
 
 
 class ChooseSpeakerId(ModalScreen[str]):
@@ -23,7 +22,7 @@ class ChooseSpeakerId(ModalScreen[str]):
     Simple dialog screen for picking the speaker id
     """
 
-    def __init__(self, speaker_ids: List[str]):
+    def __init__(self, speaker_ids: list[str]):
         super().__init__()
         self.speaker_ids = speaker_ids
 
@@ -62,9 +61,9 @@ class VoiceActorScreen(Screen):
     }
     """
 
-    def __init__(self, actors: Dict[str, VoiceActor], audio_player: AudioPlayer):
+    def __init__(self, actors: dict[str, VoiceActor], audio_player: AudioPlayer):
         super().__init__()
-        self.actors: Dict[str, VoiceActor] = actors
+        self.actors: dict[str, VoiceActor] = actors
         self.audio_player: AudioPlayer = audio_player
 
         def delete_callback(path: Path):
@@ -72,7 +71,7 @@ class VoiceActorScreen(Screen):
 
         self.audio_player.register_finished_callback(delete_callback)
 
-        self._tmp: tempfile.TemporaryDirectory = tempfile.TemporaryDirectory(
+        self._tmp: tempfile.TemporaryDirectory[str] = tempfile.TemporaryDirectory(
             prefix="rpg-test-voices"
         )
         self.temp_folder_path: Path = Path(self._tmp.name)
@@ -94,7 +93,7 @@ class VoiceActorScreen(Screen):
     def on_mout(self) -> None:
         editor: TextArea = self.query_one(TextArea)
         editor.cursor_location = editor.document.end
-        editor.focus()
+        _ = editor.focus()
 
     @on(Button.Pressed, "#actor_buttons .actor")
     async def handle_speak_button(self, event: Button.Pressed) -> None:
@@ -118,10 +117,10 @@ class VoiceActorScreen(Screen):
         message = ChatMessage.speech(result, text)
         label: Label = self.query_one("#test_label")
         label.update(f"Played: {name} with speaker id {result}")
-        if actor.can_speak_out_loud:
-            actor.speak_message_out_load(message)
+        if isinstance(actor, OutLoudVoiceActor):
+            actor.speak_message_out_loud(message)
         else:
-            audio_path = actor.speak_message(message, self.temp_folder_path)
+            audio_path = actor.synthesize(message, self.temp_folder_path)
             self.audio_player.play_file(audio_path)
 
 
@@ -129,7 +128,7 @@ class VoiceActorTestApp(App):
     TITLE = "Voice Actor Test App"
 
     def on_ready(self) -> None:
-        actors: Dict[str, VoiceActor] = {}
+        actors: dict[str, VoiceActor] = {}
         actor1 = PiperVoiceActor.with_all_speaker_ids(
             "piper-models/en_US-lessac-medium.onnx"
         )

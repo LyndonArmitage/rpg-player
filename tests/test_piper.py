@@ -1,7 +1,9 @@
-from rpg_player.chat_message import ChatMessage
-from rpg_player.piper_voice_actor import PiperVoiceActor
+from pathlib import Path
 
-TEST_MODEL_PATH = "piper-models/en_US-lessac-medium.onnx"
+from rpg_player.domain.chat_message import ChatMessage
+from rpg_player.voice.piper import PiperVoiceActor
+
+TEST_MODEL_PATH: Path = Path("piper-models/en_US-lessac-medium.onnx")
 
 
 def test_piper_should_speak():
@@ -10,19 +12,19 @@ def test_piper_should_speak():
     message = ChatMessage.speech("Bob", "This is a test.")
     bad_message = ChatMessage.speech("Jerry", "This is a bad test.")
     narrate_message = ChatMessage.narration("DM", "It was a dark and stormy night")
-    assert actor.should_speak_message(message), "Should have worked"
-    assert not actor.should_speak_message(
+    assert actor.should_speak(message), "Should have worked"
+    assert not actor.should_speak(
         bad_message
     ), "Should not have worked for other person"
-    assert not actor.should_speak_message(
+    assert not actor.should_speak(
         narrate_message
     ), "Should not have worked for narration"
 
 
-def test_piper_speaking(tmp_path):
+def test_piper_speaking(tmp_path: Path):
     actor = PiperVoiceActor("Bob", TEST_MODEL_PATH)
     message = ChatMessage.speech("Bob", "This is a test.")
-    path = actor.speak_message(message, tmp_path)
+    path = actor.synthesize(message, tmp_path)
 
     assert len(list(tmp_path.iterdir())) == 1, "Missing file"
     assert path.exists(), f"{path} should exist"

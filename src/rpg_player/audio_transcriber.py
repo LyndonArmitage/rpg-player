@@ -129,7 +129,7 @@ class OpenAIAudioTranscriber(AudioTranscriber):
                 )
             return response.text
         except Exception as e:
-            raise RuntimeError(f"Transcription failed: {e}")
+            raise RuntimeError("Transcription failed") from e
 
     @property
     @override
@@ -169,7 +169,7 @@ class OpenAIAudioTranscriber(AudioTranscriber):
                 # At the end, report everything with done=True
                 handler(file, full_text, True)
         except Exception as e:
-            raise RuntimeError(f"Streaming transcription failed: {e}")
+            raise RuntimeError("Streaming transcription failed") from e
 
 
 class DummyAudioTranscriber(AudioTranscriber):

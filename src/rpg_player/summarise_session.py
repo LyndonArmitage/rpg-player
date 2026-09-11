@@ -11,14 +11,21 @@ import argparse
 import json
 import logging
 import os
+from dataclasses import asdict
 from pathlib import Path
-from typing import List, NamedTuple, Optional
+from typing import NamedTuple, cast
 
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from .chat_message import ChatMessage, ChatMessages, MessageType
-from .token_counter import TiktokenTokenCounter, TokenCounter
+from rpg_player.domain.chat_message import (
+    ChatMessage,
+    ChatMessages,
+    MessageType,
+    load_messages_from_file,
+)
+from rpg_player.domain.token_counter import TokenCounter
+from rpg_player.token_counter import TiktokenTokenCounter
 
 log = logging.getLogger(__name__)
 
@@ -77,7 +84,7 @@ class Summaries(NamedTuple):
 
 
 def main():
-    load_dotenv()
+    _ = load_dotenv()
     parser = argparse.ArgumentParser(
         prog="summarise_session",
         description=(
@@ -86,7 +93,7 @@ def main():
         ),
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "input_path",
         help=(
             "The path to the input messages file.\n"
@@ -94,20 +101,20 @@ def main():
         ),
         type=Path,
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "output_path",
         help="The path to the output messages file.",
         type=Path,
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--model",
         help="The OpenAI model to use.",
         default="gpt-5",
         type=str,
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--dryrun",
         help="whether to run as a dryrun or not",
         action="store_true",
@@ -117,21 +124,23 @@ def main():
 
     openai_client: OpenAI = _get_openai(args)
 
-    input_path: Path = args.input_path
-    output_path: Path = args.output_path
-    model: str = args.model
-    dryrun: bool = args.dryrun
+    input_path: Path = cast(Path, args.input_path)
+    output_path: Path = cast(Path, args.output_path)
+    model: str = cast(str, args.model)
+    dryrun: bool = cast(bool, args.dryrun)
 
     # Load the messages
     messages: ChatMessages = _load_messages(input_path, model)
 
     token_counter: TokenCounter = _get_token_counter(model)
     # Count the tokens so we can evaluate how well we shrink the context
-    counted_tokens: int = token_counter.count_total(messages)
+    counted_tokens: int = token_counter.count_sum(messages)
     print(f"Found {counted_tokens} raw tokens")
 
     # Find existing summaries
-    existing_summaries: List[ChatMessage] = messages.filter_type(MessageType.SUMMARY)
+    existing_summaries: list[ChatMessage] = list(
+        messages.filter_type(MessageType.SUMMARY)
+    )
 
     if dryrun:
         print("Stopping in dryrun mode")
@@ -151,8 +160,8 @@ def main():
     print(combined_summary)
     summary_message: ChatMessage = ChatMessage.summary("DM", combined_summary)
     with output_path.open("w", encoding="utf-8") as f:
-        f.write(json.dumps(summary_message.to_dict()))
-        f.write("\n")
+        _ = f.write(json.dumps(asdict(summary_message)))
+        _ = f.write("\n")
 
     summary_tokens: int = token_counter.count(summary_message)
     print(f"Original token count {counted_tokens} vs summary count {summary_tokens}")
@@ -172,7 +181,7 @@ def summarise_session(client: OpenAI, model: str, messages: ChatMessages) -> str
     delimiter: str = "\n---\n"
     msg_count: int = 0
     for msg in messages.messages:
-        if msg.type == MessageType.SUMMARY:
+        if msg.message_type == MessageType.SUMMARY:
             continue
         msg_count += 1
         line: str = format_message(msg) + delimiter
@@ -190,7 +199,7 @@ def generate_summaries(
     client: OpenAI,
     model: str,
     messages: ChatMessages,
-    existing_summaries: List[ChatMessage],
+    existing_summaries: list[ChatMessage],
 ) -> Summaries:
     """
     Summarise the current session as well as create an ongoing summary
@@ -203,13 +212,13 @@ def generate_summaries(
 
 
 def summarise_summaries(
-    client: OpenAI, model: str, existing_summaries: List[ChatMessage], last_session: str
+    client: OpenAI, model: str, existing_summaries: list[ChatMessage], last_session: str
 ) -> str:
     """
     Take all the previous summaries and the current summary and generate a
     running summary.
     """
-    summary_texts: List[str] = [msg.content.strip() for msg in existing_summaries]
+    summary_texts: list[str] = [msg.content.strip() for msg in existing_summaries]
     summary_texts.append(last_session)
     text = "\n---\n".join(summary_texts).strip()
     return run_summary(client, model, text, RUNNING_SUMMARY_PROMPT)
@@ -222,22 +231,9 @@ def run_summary(client: OpenAI, model: str, text: str, instructions: str) -> str
         model=model,
     )
 
-    # Depending on model the output can be slightly different
-    output = getattr(response, "output", None) or []
-    collected: List[str] = []
-    for item in output:
-        if getattr(item, "type", None) != "message":
-            continue
-        # item.content is a list of blocks
-        for block in getattr(item, "content", []) or []:
-            if getattr(block, "type", None) == "output_text":
-                txt = getattr(block, "text", "") or ""
-                if txt:
-                    collected.append(txt)
-    if collected:
-        return "\n".join(collected).strip()
-    # Fallback to output_text
-    return (getattr(response, "output_text", "") or "").strip()
+    # NOTE: Previously this did a lot of stuff based on the shape of the output
+    # If this is still needed we will need to handle it.
+    return response.output_text
 
 
 def format_message(msg: ChatMessage) -> str:
@@ -245,21 +241,18 @@ def format_message(msg: ChatMessage) -> str:
     return line
 
 
-def _load_messages(path: Path, model: str) -> ChatMessages:
+def _load_messages(path: Path, _model: str) -> ChatMessages:
     log.info(f"Loading messages from {path}")
-    loaded: List[ChatMessage] = ChatMessages.load_messages_from_file(path)
+    loaded: list[ChatMessage] = load_messages_from_file(path)
     count: int = len(loaded)
-    system_role: str = "system"
-    if model.startswith("gpt-5"):
-        system_role = "developer"
-    msgs = ChatMessages(system_role)
+    msgs = ChatMessages()
     msgs.extend(loaded)
     log.info(f"Loaded {count} messages")
     return msgs
 
 
 def _get_openai(args: argparse.Namespace) -> OpenAI:
-    api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
+    api_key: str | None = os.getenv("OPENAI_API_KEY")
     if not api_key:
         if "openai_api_key" in args:
             api_key = getattr(args, "open_api_key", None)

@@ -1,5 +1,10 @@
 # RPG Player
 
+> [!IMPORTANT]
+> This project currently undergoing a rewrite.
+> I was not satisfied with the state of the Python code within so a lot of it
+> is being ripped apart and rebuilt
+
 A local multi-agent AI RPG tool inspired by DougDoug's AI RPG videos and the
 [Multi-Agent-GPT-Characters](https://github.com/DougDougGithub/Multi-Agent-GPT-Characters)
 repo.

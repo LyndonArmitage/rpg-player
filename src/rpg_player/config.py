@@ -3,24 +3,25 @@ import logging
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Union
 
 from elevenlabs.client import ElevenLabs
 from openai import OpenAI
 
-from .agent import Agent, OpenAIAgent
-from .basic_voice_actor import BasicVoiceActor
-from .elevenlabs_voice_actor import ElevenlabsVoiceActor
-from .openai_voice_actor import OpenAIVoiceActor
-from .piper_voice_actor import PiperVoiceActor
+from rpg_player.agents.openai import OpenAIAgent
+from rpg_player.domain.agent import Agent
+from rpg_player.domain.voice_actor import VoiceActor
+from rpg_player.voice.basic import BasicVoiceActor
+from rpg_player.voice.elevenlabs import ElevenlabsVoiceActor
+from rpg_player.voice.openai import OpenAIVoiceActor
+from rpg_player.voice.piper import PiperVoiceActor
+
 from .prompt_parser import PromptParser
-from .voice_actor import VoiceActor
 
 
 @dataclass
 class APIKeys:
-    openai: Optional[str] = None
-    elevenlabs: Optional[str] = None
+    openai: str | None = None
+    elevenlabs: str | None = None
 
     def get_openai_client(self) -> OpenAI:
         """
@@ -62,7 +63,7 @@ class AgentConfig:
     def create_agent(self, prompt_config: PromptConfig, **kwargs) -> Agent:
         match self.type.casefold():
             case "openai":
-                openai: Optional[OpenAI] = kwargs.get("openai")
+                openai: OpenAI | None = kwargs.get("openai")
                 if not openai:
                     raise ValueError("Missing 'openai' parameter")
                 if not isinstance(openai, OpenAI):
@@ -95,10 +96,10 @@ class AgentConfig:
 @dataclass
 class VoiceActorConfig:
     type: str
-    speakers: List[str]
+    speakers: list[str]
     args: dict
 
-    def create_actor(self, api_keys: Optional[APIKeys]) -> VoiceActor:
+    def create_actor(self, api_keys: APIKeys | None) -> VoiceActor:
         match self.type.casefold():
             case "piper":
                 return self._create_piper_actor()
@@ -116,13 +117,13 @@ class VoiceActorConfig:
         if not model_path:
             raise ValueError("Missing 'model_path' from args")
         actor = PiperVoiceActor(self.speakers, Path(model_path))
-        speaker_ids: Dict[str, int] = args.get("speaker_ids", {})
+        speaker_ids: dict[str, int] = args.get("speaker_ids", {})
         for name, speaker_id in speaker_ids.items():
             actor.set_speaker_id_for(name, speaker_id)
         return actor
 
     def _create_elevenlabs_actor(
-        self, api_keys: Optional[APIKeys]
+        self, api_keys: APIKeys | None
     ) -> ElevenlabsVoiceActor:
         client: ElevenLabs = None
         if api_keys:
@@ -130,10 +131,10 @@ class VoiceActorConfig:
         else:
             client = ElevenLabs()
         args: dict = self.args
-        voice_id: Optional[str] = args.get("voice_id")
+        voice_id: str | None = args.get("voice_id")
         if not voice_id:
             raise ValueError("Missing 'voice_id' from args")
-        model_id: Optional[str] = args.get("model_id")
+        model_id: str | None = args.get("model_id")
         if not model_id:
             return ElevenlabsVoiceActor(self.speakers, client, voice_id)
         else:
@@ -141,7 +142,7 @@ class VoiceActorConfig:
                 self.speakers, client, voice_id, model_id=model_id
             )
 
-    def _create_openai_actor(self, api_keys: Optional[APIKeys]) -> OpenAIVoiceActor:
+    def _create_openai_actor(self, api_keys: APIKeys | None) -> OpenAIVoiceActor:
         client: OpenAI = None
         if api_keys:
             client = api_keys.get_openai_client()
@@ -161,11 +162,11 @@ class Config:
     """
 
     prompt_config: PromptConfig
-    messages_path: Optional[Path] = None
-    api_keys: Optional[APIKeys] = None
-    agents: List[AgentConfig] = field(default_factory=list)
-    voice_actors: List[VoiceActorConfig] = field(default_factory=list)
-    text_chat_path: Optional[Path] = None
+    messages_path: Path | None = None
+    api_keys: APIKeys | None = None
+    agents: list[AgentConfig] = field(default_factory=list)
+    voice_actors: list[VoiceActorConfig] = field(default_factory=list)
+    text_chat_path: Path | None = None
 
     @staticmethod
     def from_dict(data: dict) -> "Config":
@@ -173,7 +174,7 @@ class Config:
         Load configuration from a dictionary object
         """
 
-        def path_or_none(val) -> Optional[Path]:
+        def path_or_none(val) -> Path | None:
             if val is None:
                 return None
             return Path(val)
@@ -216,7 +217,7 @@ class Config:
         )
 
     @staticmethod
-    def from_path(path: Union[Path, str]) -> "Config":
+    def from_path(path: Path | str) -> "Config":
         """
         Load configuration from a given path
         """

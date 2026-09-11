@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Callable, Optional, override
 
-import sounddevice as sd
-import soundfile as sf
+import sounddevice as sd  # pyright: ignore[reportMissingTypeStubs]
+import soundfile as sf  # pyright: ignore[reportMissingTypeStubs]
 
 log = logging.getLogger(__name__)
 

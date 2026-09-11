@@ -1,11 +1,17 @@
 import json
 import logging
+from dataclasses import asdict
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable
 
-from .agent import Agent
+from rpg_player.domain.agent import Agent
+from rpg_player.domain.chat_message import (
+    ChatMessage,
+    ChatMessages,
+    load_messages_from_file,
+)
+
 from .audio_player import SoundDevicePlayer
-from .chat_message import ChatMessage, ChatMessages
 from .message_transformer import ChatMessageTransformer
 from .voice_actor import VoiceActorManager
 
@@ -20,7 +26,7 @@ class StateMachine:
     @staticmethod
     def _load_messages_file(file: Path, container: ChatMessages):
         log.info(f"Loading messages file: {file}")
-        loaded_msgs: List[ChatMessage] = ChatMessages.load_messages_from_file(file)
+        loaded_msgs: list[ChatMessage] = load_messages_from_file(file)
         # Load messages file
         count = len(loaded_msgs)
         log.info(f"Read {count} messages")
@@ -36,19 +42,19 @@ class StateMachine:
 
     def __init__(
         self,
-        agents: List[Agent],
+        agents: list[Agent],
         voice_actors: VoiceActorManager,
-        message_listener: Optional[Callable[[ChatMessage], None]] = None,
-        messages_file: Optional[Path] = None,
+        message_listener: Callable[[ChatMessage], None] | None = None,
+        messages_file: Path | None = None,
         delete_audio: bool = True,
         system_role: str = "developer",
-        message_transformer: Optional[ChatMessageTransformer] = None,
+        message_transformer: ChatMessageTransformer | None = None,
     ):
-        self.messages: ChatMessages = ChatMessages(system_role)
-        self.agents: List[Agent] = agents
+        self.messages: ChatMessages = ChatMessages()
+        self.agents: list[Agent] = agents
         self.voice_actors: VoiceActorManager = voice_actors
         self.player: SoundDevicePlayer = SoundDevicePlayer()
-        self.message_transformer: Optional[ChatMessageTransformer] = message_transformer
+        self.message_transformer: ChatMessageTransformer | None = message_transformer
         if delete_audio:
 
             def delete_path(path: Path):
@@ -57,12 +63,10 @@ class StateMachine:
 
             self.player.register_finished_callback(delete_path)
 
-        self.message_listener: Optional[Callable[[ChatMessage], None]] = (
-            message_listener
-        )
+        self.message_listener: Callable[[ChatMessage], None] | None = message_listener
 
         # Loading and restoring state
-        self.messages_file: Optional[Path] = None
+        self.messages_file: Path | None = None
         if messages_file:
             self.messages_file = messages_file
             if messages_file.exists():
@@ -79,18 +83,18 @@ class StateMachine:
         if self.messages_file:
             # Append to messages file
             with self.messages_file.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(message.to_dict()))
-                f.write("\n")
+                _ = f.write(json.dumps(asdict(message)))
+                _ = f.write("\n")
         if self.message_listener:
             self.message_listener(message)
 
     @property
-    def agent_names(self) -> List[str]:
+    def agent_names(self) -> list[str]:
         return [a.name for a in self.agents]
 
     def get_last_message(
-        self, exclude_authors: Optional[List[str]] = None
-    ) -> Optional[ChatMessage]:
+        self, exclude_authors: list[str] | None = None
+    ) -> ChatMessage | None:
         """
         Return the last chat message, optionally excluding the list of authors.
         """
@@ -132,7 +136,7 @@ class StateMachine:
         log.debug(f"Playing audio: {path}")
         if self.player.is_playing or self.player.is_paused:
             self.player.stop_audio()
-        self.player.play_file(path)
+        _ = self.player.play_file(path)
 
     def stop_audio(self):
         self.player.stop_audio()
