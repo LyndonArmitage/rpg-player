@@ -2,7 +2,7 @@ import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from random import Random
-from typing import Callable, Iterable, List, Optional, Union, override
+from typing import Callable, Iterable, override
 
 from openai import OpenAI
 
@@ -79,7 +79,7 @@ class OpenAIAudioTranscriber(AudioTranscriber):
         openai: OpenAI,
         model: str = "gpt-4o-transcribe",
         language: str = "en",
-        extra_kwargs: Optional[dict] = None,
+        extra_kwargs: dict | None = None,
     ):
         """
         :param openai: OpenAI SDK client
@@ -182,15 +182,13 @@ class DummyAudioTranscriber(AudioTranscriber):
     instance is used to pick from these.
     """
 
-    def __init__(
-        self, dummy_text: Union[str, Iterable[str]], random: Optional[Random] = None
-    ):
+    def __init__(self, dummy_text: str | Iterable[str], random: Random | None = None):
         if random:
             self.random: Random = random
         else:
             self.random: Random = Random()
         if isinstance(dummy_text, str):
-            self.dummy_text: List[str] = [dummy_text]
+            self.dummy_text: list[str] = [dummy_text]
         else:
             self.dummy_text = [str(t) for t in dummy_text]
         self._dummy_len: int = len(self.dummy_text)

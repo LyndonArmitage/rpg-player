@@ -4,7 +4,6 @@ import asyncio
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from rich.markdown import Markdown
 from textual import on
@@ -70,11 +69,11 @@ class NarrationScreen(Screen):
         self.recorder: AudioRecorder = SoundDeviceRecorder()
         self.messages: ChatMessages = messages
         # Path to temporary audio file for the current recording
-        self._current_audio_path: Optional[Path] = None
+        self._current_audio_path: Path | None = None
         # Task used while recording (starts recorder.start_recording)
-        self._record_task: Optional[asyncio.Task] = self._record_task
+        self._record_task: asyncio.Task | None = self._record_task
         # Task used when running transcription (if any)
-        self._transcribe_task: Optional[asyncio.Task] = None
+        self._transcribe_task: asyncio.Task | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)

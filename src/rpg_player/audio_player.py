@@ -2,7 +2,7 @@ import logging
 import threading
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Callable, Optional, override
+from typing import Callable, override
 
 import sounddevice as sd  # pyright: ignore[reportMissingTypeStubs]
 import soundfile as sf  # pyright: ignore[reportMissingTypeStubs]
@@ -77,12 +77,12 @@ class SoundDevicePlayer(AudioPlayer):
     """
 
     def __init__(self, blocksize: int = 1024):
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._stop_flag: threading.Event = threading.Event()
         self._unpaused: threading.Event = threading.Event()
         self._blocksize: int = blocksize
-        self._progress_callback: Optional[Callable[[float, float], None]] = None
-        self._finished_callback: Optional[Callable[[Path], None]] = None
+        self._progress_callback: Callable[[float, float], None] | None = None
+        self._finished_callback: Callable[[Path], None] | None = None
         self._frames_played: int = 0
         self._samplerate: int = 0
         self._duration: float = 0.0

@@ -6,17 +6,19 @@ import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from random import Random
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, ClassVar, override
 
 from dotenv import load_dotenv
 from openai import OpenAI
 from rich.markdown import Markdown
 from textual import on, work
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, VerticalGroup
 from textual.events import Resize
 from textual.logging import TextualHandler
 from textual.screen import Screen
+from textual.types import CSSPathType
 from textual.widgets import Button, Footer, Header, Label, RichLog, Rule, Switch
 
 from rpg_player.agents.openai import OpenAIAgent
@@ -32,28 +34,29 @@ from .state_machine import StateMachine
 from .voice_actor import VoiceActorManager
 
 
-class Standby(Screen):
-    TITLE = "RPG Party"
-    SUB_TITLE = "Standby"
-    CSS_PATH = "standby.tcss"
-    BINDINGS = [
-        ("0", "enter_narrate", "Narrate"),
-        ("1", "agent_1_respond", "Agent 1 Respond"),
-        ("2", "agent_2_respond", "Agent 2 Respond"),
-        ("3", "agent_3_respond", "Agent 3 Respond"),
-        ("a", "random_respond", "Random Respond"),
-        ("r", "random_not_last_respond", "Not Last Respond"),
+class Standby(Screen[None]):
+    TITLE: ClassVar[str | None] = "RPG Party"
+    SUB_TITLE: ClassVar[str | None] = "Standby"
+    CSS_PATH: ClassVar[CSSPathType | None] = "standby.tcss"
+    BINDINGS: list[Binding] = [
+        Binding("0", "enter_narrate", "Narrate"),
+        Binding("1", "agent_1_respond", "Agent 1 Respond"),
+        Binding("2", "agent_2_respond", "Agent 2 Respond"),
+        Binding("3", "agent_3_respond", "Agent 3 Respond"),
+        Binding("a", "random_respond", "Random Respond"),
+        Binding("r", "random_not_last_respond", "Not Last Respond"),
     ]
 
     def __init__(self, state_machine: StateMachine, transcriber: AudioTranscriber):
         super().__init__()
         self.state_machine: StateMachine = state_machine
-        self.agent_names = state_machine.agent_names
+        self.agent_names: list[str] = state_machine.agent_names
         self.random: Random = Random()
-        self._disable_bindings = threading.Event()
-        self.rendered_messages: list = []
+        self._disable_bindings: threading.Event = threading.Event()
+        self.rendered_messages: list[object] = []
         self.transcriber: AudioTranscriber = transcriber
 
+    @override
     def compose(self) -> ComposeResult:
         yield Header()
         yield RichLog(id="messages", wrap=True)
@@ -97,13 +100,13 @@ class Standby(Screen):
         self.action_random_not_last_respond()
 
     @on(Resize)
-    def _reflow_log(self, _: Resize) -> None:
+    def _reflow_log(self, _ignore: Resize) -> None:
         # TODO: This might be a bit heavy with hundreds of messages
         if self.rendered_messages:
             log: RichLog = self.query_one("#messages", RichLog)
-            log.clear()
+            _ = log.clear()
             for msg in self.rendered_messages:
-                log.write(msg, shrink=False)
+                _ = log.write(msg, shrink=False)
 
     def action_agent_1_respond(self):
         if self._disable_bindings.is_set():
@@ -183,7 +186,7 @@ class Standby(Screen):
             return
         if len(self.agent_names) <= 1:
             return
-        last_msg: Optional[ChatMessage] = self.state_machine.get_last_message(["DM"])
+        last_msg: ChatMessage | None = self.state_machine.get_last_message(["DM"])
         if not last_msg:
             return self.action_random_respond()
         if last_msg.author not in self.agent_names:
@@ -222,15 +225,15 @@ class Standby(Screen):
         self.query_one("#buttons #not-last").disabled = disabled
 
 
-class MainApp(App):
-    TITLE = "RPG Party"
+class MainApp(App[None]):
+    TITLE: str | None = "RPG Party"
 
-    def __init__(self, config_path: Optional[Path] = None):
+    def __init__(self, config_path: Path | None = None):
         super().__init__()
         if not config_path:
             config_path = Path("config.json")
         self.config_path: Path = config_path
-        self.chat_log_path: Optional[Path] = None
+        self.chat_log_path: Path | None = None
 
     def on_ready(self) -> None:
         config_path: Path = self.config_path
@@ -240,7 +243,7 @@ class MainApp(App):
         logger = logging.getLogger(__name__)
         logger.info(f"Loading from {config_path}")
         config: Config = Config.from_path(config_path)
-        agents: List[Agent] = []
+        agents: list[Agent] = []
         # TODO: Make this neater
         openai: OpenAI = _get_openai(config)
         gpt_models: set[str] = set()
@@ -264,8 +267,8 @@ class MainApp(App):
             actor: VoiceActor = actor_config.create_actor(config.api_keys)
             voice_actors.register_actor(actor)
 
-        messages_path: Optional[Path] = config.messages_path
-        message_listener: Optional[Callable[[ChatMessage], None]] = None
+        messages_path: Path | None = config.messages_path
+        message_listener: Callable[[ChatMessage], None] | None = None
         if config.text_chat_path:
             self.chat_log_path = config.text_chat_path
             message_listener = self.append_message_to_file
@@ -320,12 +323,12 @@ def _get_openai(config: Config) -> OpenAI:
     if api_keys:
         return api_keys.get_openai_client()
     else:
-        openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
+        openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
         return OpenAI(api_key=openai_api_key)
 
 
 def setup_logging(level: int = logging.INFO, logfile: str | None = None) -> None:
-    handlers: List[logging.Handler] = [TextualHandler()]
+    handlers: list[logging.Handler] = [TextualHandler()]
     if logfile:
         file_handler = RotatingFileHandler(
             logfile, maxBytes=10_000_000, backupCount=3, encoding="utf-8"

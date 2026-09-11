@@ -34,15 +34,12 @@ dev = [
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.uv]
-cache-dir = ".uv-cache"
-
-[tool.isort]
-profile = "black"
-
 [tool.black]
 line-length = 88
 target-version = ["py313"]
+
+[tool.isort]
+profile = "black"
 
 [tool.pytest]
 addopts = ["-ra", "-q"]
@@ -55,7 +52,17 @@ line-length = 88
 extend-exclude = ["typings"]
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "B", "I"]
+select = [
+  "E4",
+  "E7",
+  "E9",
+  "F",
+  "B",
+  "I",
+  "UP006",  # non-pep585-annotation (List → list, etc.)
+  "UP007",  # non-pep604-annotation-union (Union → |)
+  "UP045",  # non-pep604-annotation-optional (Optional → | None)
+]
 ignore = ["E501"]
 unfixable = ["B"]
 
@@ -65,3 +72,6 @@ unfixable = ["B"]
 
 [tool.ruff.format]
 quote-style = "double"
+
+[tool.uv]
+cache-dir = ".uv-cache"
