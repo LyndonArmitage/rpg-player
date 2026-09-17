@@ -1,77 +1,146 @@
+from __future__ import annotations
+
+import threading
 import time
 from pathlib import Path
+from typing import Callable, ClassVar
 
-from rpg_player.audio_player import SoundDevicePlayer
+import pytest
+import sounddevice as sd
 
+from rpg_player.audio.sounddevice import SoundDevicePlayer
 
-def test_play_and_progress(temp_wav: Path, patch_sounddevice):
-    calls = []
-
-    def on_progress(current, total):
-        calls.append((current, total))
-
-    player = SoundDevicePlayer(blocksize=512)
-    player.register_progress_callback(on_progress)
-    started = player.play_file(temp_wav)
-    assert started
-
-    # Wait for playback to finish (with timeout safeguard)
-    t0 = time.time()
-    while player.is_playing and (time.time() - t0) < 5.0:
-        time.sleep(0.01)
-
-    # Finished; we should have at least one progress callback and total set
-    assert calls, "Expected at least one progress callback"
-    # last callback should be close to duration
-    last_current, last_total = calls[-1]
-    assert last_total > 0
-    assert last_current <= last_total + 1e-3
+Callback = Callable[[bytearray, int, object, object], None]
 
 
-def test_pause_resume_blocks_progress(temp_wav: Path, patch_sounddevice):
-    calls = []
+class FakeRawOutputStream:
+    """Small callback-driven RawOutputStream replacement for unit tests."""
 
-    def on_progress(current, total):
-        calls.append((current, total))
+    instances: ClassVar[list[FakeRawOutputStream]] = []
 
-    player = SoundDevicePlayer(blocksize=256)
-    player.register_progress_callback(on_progress)
-    assert player.play_file(temp_wav)
+    def __init__(
+        self,
+        samplerate: int,
+        blocksize: int,
+        channels: int,
+        dtype: str,
+        callback: Callback,
+    ) -> None:
+        self.samplerate = samplerate
+        self.blocksize = blocksize
+        self.channels = channels
+        self.dtype = dtype
+        self.callback = callback
+        self.started = threading.Event()
+        self.closed = False
+        self.callback_count = 0
+        self._callback_done = threading.Event()
+        type(self).instances.append(self)
 
-    # Let a little progress happen
-    time.sleep(0.05)
+    def __enter__(self) -> FakeRawOutputStream:
+        self.started.set()
 
-    player.pause()
+        def run_callback() -> None:
+            try:
+                while True:
+                    outdata = bytearray(self.blocksize * self.channels * 4)
+                    time.sleep(0.02)
+                    try:
+                        self.callback(outdata, self.blocksize, None, None)
+                    except (sd.CallbackAbort, sd.CallbackStop):
+                        break
+                    self.callback_count += 1
+            finally:
+                self._callback_done.set()
 
-    # Wait until the player transitions to paused (ack the pause)
-    t0 = time.time()
-    while not player.is_paused and (time.time() - t0) < 1.0:
+        threading.Thread(target=run_callback, daemon=True).start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self._callback_done.wait(timeout=2)
+        self.closed = True
+
+
+@pytest.fixture
+def fake_output_stream(monkeypatch: pytest.MonkeyPatch) -> None:
+    FakeRawOutputStream.instances.clear()
+    monkeypatch.setattr(sd, "RawOutputStream", FakeRawOutputStream)
+
+
+def wait_for_stream(timeout: float = 1.0) -> FakeRawOutputStream:
+    deadline = time.monotonic() + timeout
+    while not FakeRawOutputStream.instances and time.monotonic() < deadline:
         time.sleep(0.001)
-
-    paused_len = len(calls)
-
-    time.sleep(0.05)
-    assert len(calls) == paused_len, "Progress advanced while paused"
-
-    player.resume()
-    t0 = time.time()
-    while player.is_playing and (time.time() - t0) < 5.0:
-        time.sleep(0.01)
+    assert FakeRawOutputStream.instances
+    return FakeRawOutputStream.instances[0]
 
 
-def test_stop_mid_playback(temp_wav: Path, patch_sounddevice):
-    calls = []
+def wait_until_stopped(player: SoundDevicePlayer, timeout: float = 2.0) -> None:
+    deadline = time.monotonic() + timeout
+    while player.is_playing and time.monotonic() < deadline:
+        time.sleep(0.005)
+    assert not player.is_playing
 
-    def on_progress(current, total):
-        calls.append((current, total))
 
+def test_play_and_report_progress(temp_wav: Path, fake_output_stream: None) -> None:
+    progress: list[tuple[float, float]] = []
+    finished: list[Path] = []
     player = SoundDevicePlayer(blocksize=512)
-    player.register_progress_callback(on_progress)
-    assert player.play_file(temp_wav)
+    player.register_progress_callback(
+        lambda current, total: progress.append((current, total))
+    )
+    player.register_finished_callback(finished.append)
 
-    # Let a few blocks play then stop
-    time.sleep(0.03)
+    assert player.play_file(temp_wav)
+    wait_until_stopped(player)
+
+    assert progress
+    assert progress[0][0] == 0.0
+    assert progress[-1][0] == pytest.approx(progress[-1][1])
+    assert progress[-1][1] == pytest.approx(0.25, abs=0.01)
+    assert finished == [temp_wav]
+    assert FakeRawOutputStream.instances[0].closed
+
+
+def test_cannot_start_a_second_file_while_playing(
+    temp_wav: Path, fake_output_stream: None
+) -> None:
+    player = SoundDevicePlayer(blocksize=64)
+    assert player.play_file(temp_wav)
+    stream = wait_for_stream()
+    assert stream.started.is_set()
+
+    assert not player.play_file(temp_wav)
+    player.stop_audio()
+    assert not player.is_playing
+
+
+def test_stop_audio_finishes_playback_and_calls_callback(
+    temp_wav: Path, fake_output_stream: None
+) -> None:
+    finished: list[Path] = []
+    player = SoundDevicePlayer(blocksize=64)
+    player.register_finished_callback(finished.append)
+
+    assert player.play_file(temp_wav)
+    stream = wait_for_stream()
+    assert stream.started.is_set()
     player.stop_audio()
 
-    # Player should not be playing now
     assert not player.is_playing
+    assert finished == [temp_wav]
+
+
+def test_missing_file_is_not_started(tmp_path: Path, fake_output_stream: None) -> None:
+    player = SoundDevicePlayer()
+
+    assert not player.play_file(tmp_path / "missing.wav")
+    assert not player.is_playing
+    assert not FakeRawOutputStream.instances
+
+
+def test_constructor_rejects_invalid_buffer_settings() -> None:
+    with pytest.raises(ValueError, match="blocksize"):
+        SoundDevicePlayer(blocksize=0)
+    with pytest.raises(ValueError, match="buffersize"):
+        SoundDevicePlayer(buffersize=0)

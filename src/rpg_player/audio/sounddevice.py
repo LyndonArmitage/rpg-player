@@ -183,6 +183,7 @@ class SoundDevicePlayer(CallbackAudioPlayer):
                 data = chunks.get_nowait()
             except queue.Empty as error:
                 log.error("Audio buffer underrun while playing %s", path)
+                self._stop_flag.set()
                 raise sd.CallbackAbort from error
 
             # RawOutputStream exposes a byte buffer.  A short final chunk must
