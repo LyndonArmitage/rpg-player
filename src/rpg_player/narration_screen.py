@@ -12,9 +12,10 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Label, RichLog, TextArea
 
+from rpg_player.audio.sounddevice import SoundDeviceRecorder
+from rpg_player.domain.audio_recorder import AudioRecorder
 from rpg_player.domain.chat_message import ChatMessages
 
-from .audio_recorder import AudioRecorder, SoundDeviceRecorder
 from .audio_transcriber import AudioTranscriber
 
 

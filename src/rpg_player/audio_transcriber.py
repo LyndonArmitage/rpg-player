@@ -2,7 +2,7 @@ import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from random import Random
-from typing import Callable, Iterable, override
+from typing import Callable, Final, Iterable, override
 
 from openai import OpenAI
 
@@ -79,7 +79,7 @@ class OpenAIAudioTranscriber(AudioTranscriber):
         openai: OpenAI,
         model: str = "gpt-4o-transcribe",
         language: str = "en",
-        extra_kwargs: dict | None = None,
+        extra_kwargs: dict[str, object] | None = None,
     ):
         """
         :param openai: OpenAI SDK client
@@ -87,10 +87,10 @@ class OpenAIAudioTranscriber(AudioTranscriber):
         :param language: Language name, should be 2 character code (default: "en")
         :param extra_kwargs: Extra keyword arguments for transcription API call
         """
-        self.openai = openai
-        self.model = model
+        self.openai: OpenAI = openai
+        self.model: Final[str] = model
 
-        self.language = language
+        self.language: Final[str] = language
         reserved_keys = {"model", "file", "language", "stream"}
         extra_kwargs = extra_kwargs or {}
         intersection = reserved_keys & extra_kwargs.keys()

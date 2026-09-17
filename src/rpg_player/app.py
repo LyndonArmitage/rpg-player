@@ -6,7 +6,7 @@ import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from random import Random
-from typing import Any, Callable, ClassVar, override
+from typing import Callable, ClassVar, cast, override
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -292,7 +292,7 @@ class MainApp(App[None]):
             )
             self.state_machine.add_message(intro_players_msg)
 
-        extra_transcriber_kwargs: dict[str, Any] = {
+        extra_transcriber_kwargs: dict[str, object] = {
             "prompt": (
                 "The following is narration from a Dungeon/Game Master "
                 "for a traditional tabletop role playing game. "
@@ -312,10 +312,10 @@ class MainApp(App[None]):
         if not self.chat_log_path:
             return
         with self.chat_log_path.open("a+", encoding="utf-8") as f:
-            f.seek(0, 2)  # move to end of file
+            _ = f.seek(0, 2)  # move to end of file
             if f.tell() > 0:  # file not empty
-                f.write("\n")
-            f.write(f"{msg.author}: {msg.content}")
+                _ = f.write("\n")
+            _ = f.write(f"{msg.author}: {msg.content}")
 
 
 def _get_openai(config: Config) -> OpenAI:
@@ -343,10 +343,10 @@ def setup_logging(level: int = logging.INFO, logfile: str | None = None) -> None
 
 
 if __name__ == "__main__":
-    load_dotenv()
+    _ = load_dotenv()
     setup_logging()
     parser = argparse.ArgumentParser(prog="app", description="Run the main application")
-    parser.add_argument(
+    _ = parser.add_argument(
         "-c",
         "--config",
         help=(
@@ -358,5 +358,5 @@ if __name__ == "__main__":
         dest="config_path",
     )
     args = parser.parse_args()
-    app = MainApp(args.config_path)
+    app = MainApp(cast(Path, args.config_path))
     app.run()
