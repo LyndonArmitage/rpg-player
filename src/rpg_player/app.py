@@ -24,9 +24,10 @@ from textual.widgets import Button, Footer, Header, Label, RichLog, Rule, Switch
 from rpg_player.agents.openai import OpenAIAgent
 from rpg_player.domain.agent import Agent
 from rpg_player.domain.chat_message import ChatMessage
+from rpg_player.domain.transcriber import AudioTranscriber
 from rpg_player.domain.voice_actor import VoiceActor
 
-from .audio_transcriber import AudioTranscriber, OpenAIAudioTranscriber
+from .audio_transcriber import OpenAIAudioTranscriber
 from .config import Config
 from .message_transformer import ChatMessageTransformer, RemovePrefixMessageTransformer
 from .narration_screen import NarrationScreen
@@ -292,17 +293,15 @@ class MainApp(App[None]):
             )
             self.state_machine.add_message(intro_players_msg)
 
-        extra_transcriber_kwargs: dict[str, object] = {
-            "prompt": (
-                "The following is narration from a Dungeon/Game Master "
-                "for a traditional tabletop role playing game. "
-                "Player character names are:"
-                "\n- "
-                "\n- ".join([a.name for a in agents])
-            )
-        }
+        transcriber_prompt = (
+            "The following is narration from a Dungeon/Game Master "
+            "for a traditional tabletop role playing game. "
+            "Player character names are:"
+            "\n- "
+            "\n- ".join([a.name for a in agents])
+        )
         transcriber: AudioTranscriber = OpenAIAudioTranscriber(
-            openai, extra_kwargs=extra_transcriber_kwargs
+            openai, extra_prompt=transcriber_prompt
         )
         standby = Standby(self.state_machine, transcriber)
         self.install_screen(standby, "standby")

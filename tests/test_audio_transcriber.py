@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock
 
 from rpg_player.audio_transcriber import OpenAIAudioTranscriber
+from rpg_player.domain.transcriber import TranscriptionResult
 
 
 def test_transcribe_returns_expected_text(monkeypatch):
@@ -18,8 +19,11 @@ def test_transcribe_returns_expected_text(monkeypatch):
     mock_openai.audio.transcriptions.create.return_value = mock_response
 
     transcriber = OpenAIAudioTranscriber(mock_openai)
-    text = transcriber.transcribe(file_path)
-    assert text == "foo bar"
+    result = transcriber.transcribe(file_path)
+    assert isinstance(result, TranscriptionResult)
+    assert result.text == "foo bar"
+    assert result.delta == "foo bar"
+    assert result.completed is True
 
     file_path.unlink()
 
@@ -41,14 +45,13 @@ def test_transcribe_returns_expected_text(monkeypatch):
     chunks = []
     fulls = []
 
-    def handler(path, text, done):
-        if done:
-            fulls.append(text)
+    def handler(result: TranscriptionResult):
+        if result.completed:
+            fulls.append(result.text)
         else:
-            chunks.append(text)
+            chunks.append(result.delta)
 
-    transcriber.transcribe_async_out(file_path, handler=handler)
-    # Should call for each chunk, and once at end with full text
+    transcriber.transcribe_stream(file_path, handler=handler)
     assert chunks == ["A ", "B ", "C"]
-    assert fulls == ["A B C"]
+    assert fulls == []
     file_path.unlink()

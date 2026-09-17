@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import tempfile
 import wave
-from dataclasses import dataclass
 from pathlib import Path
 
 from rich.markdown import Markdown
@@ -16,14 +15,7 @@ from textual.widgets import Button, Footer, Header, Label, RichLog, TextArea
 from rpg_player.audio.sounddevice import SoundDeviceRecorder
 from rpg_player.domain.audio_recorder import AudioRecorder
 from rpg_player.domain.chat_message import ChatMessages
-
-from .audio_transcriber import AudioTranscriber
-
-
-@dataclass
-class TranscriptionChunk:
-    text: str
-    is_done: bool
+from rpg_player.domain.transcriber import AudioTranscriber, TranscriptionResult
 
 
 class NarrationScreen(Screen):
@@ -176,9 +168,9 @@ class NarrationScreen(Screen):
         # main loop.
         loop = asyncio.get_running_loop()
 
-        def stream_handler(file: Path, text: str, done: bool) -> None:
+        def stream_handler(result: TranscriptionResult) -> None:
             try:
-                coro = self._append_transcription(TranscriptionChunk(text, done))
+                coro = self._append_transcription(result)
                 # Schedule coroutine safely on the main loop
                 loop.call_soon_threadsafe(lambda: asyncio.create_task(coro))
             except Exception:
@@ -188,12 +180,13 @@ class NarrationScreen(Screen):
         # Run transcription in background so UI remains responsive.  Keep the
         # streaming call inside a coroutine so API errors are displayed rather
         # than becoming an unobserved exception in the cleanup task.
-        if self.transcriber.supports_async_out:
+        transcribe_stream = getattr(self.transcriber, "transcribe_stream", None)
+        if transcribe_stream is not None:
 
             async def _run_streaming_transcription():
                 try:
                     await asyncio.to_thread(
-                        self.transcriber.transcribe_async_out,
+                        transcribe_stream,
                         audio_path,
                         stream_handler,
                     )
@@ -205,10 +198,10 @@ class NarrationScreen(Screen):
 
             async def _run_full_transcription():
                 try:
-                    text = await asyncio.to_thread(
+                    result = await asyncio.to_thread(
                         self.transcriber.transcribe, audio_path
                     )
-                    await self._append_transcription(TranscriptionChunk(text, True))
+                    await self._append_transcription(result)
                 except Exception as e:
                     self._set_status(f"Transcription failed: {e}")
 
@@ -245,15 +238,11 @@ class NarrationScreen(Screen):
         except (OSError, wave.Error):
             return False
 
-    async def _append_transcription(self, chunk: TranscriptionChunk) -> None:
+    async def _append_transcription(self, result: TranscriptionResult) -> None:
         editor = self.query_one(TextArea)
-        current = editor.text or ""
-        if chunk.is_done and current == "":
-            # replace all text with final output
-            editor.text = chunk.text
-        elif not chunk.is_done:
-            # append text
-            editor.text = f"{current}{chunk.text}"
+        # TranscriptionResult.text is the complete transcription so far, not
+        # merely the newly received delta.
+        editor.text = result.text
         editor.cursor_location = (
             editor.document.end
         )  # move caret to end; TextArea auto-scrolls when cursor/selection changes
