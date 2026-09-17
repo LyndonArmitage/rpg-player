@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import tempfile
+import wave
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -135,11 +136,16 @@ class NarrationScreen(Screen):
         if self._current_audio_path is None:
             return
 
-        # Stop the device recorder
+        # Stop the device recorder.  The returned path is important: a recorder
+        # can fail in its worker thread (for example when the input device is
+        # unavailable) while still leaving the temporary WAV file behind.  Do
+        # not send that empty file to Whisper; silence/invalid audio commonly
+        # produces convincing but unrelated hallucinations.
         try:
-            await self.recorder.stop_recording()
+            stopped_path = await self.recorder.stop_recording()
         except Exception as e:
             self._set_status(f"Failed stopping recorder: {e}")
+            stopped_path = None
 
         # Ensure any recording waiter task is finished
         if self._record_task and not self._record_task.done():
@@ -152,10 +158,17 @@ class NarrationScreen(Screen):
         audio_path = self._current_audio_path
         self._current_audio_path = None
 
-        if not audio_path or not audio_path.exists():
+        if (
+            stopped_path is None
+            or not audio_path
+            or not audio_path.exists()
+            or not self._contains_audio(audio_path)
+        ):
             self._set_status(
-                "Recording finished, but no audio file available for transcription."
+                "No audio was recorded. Check the input device and microphone permissions."
             )
+            if audio_path and audio_path.exists():
+                audio_path.unlink(missing_ok=True)
             return
 
         # Prepare a handler to be called by streaming transcribers. The handler
@@ -172,14 +185,22 @@ class NarrationScreen(Screen):
                 # swallow handler exceptions to avoid breaking background thread
                 pass
 
-        # Run transcription in background so UI remains responsive
+        # Run transcription in background so UI remains responsive.  Keep the
+        # streaming call inside a coroutine so API errors are displayed rather
+        # than becoming an unobserved exception in the cleanup task.
         if self.transcriber.supports_async_out:
-            # transcribe_async_out is synchronous in our transcriber; run it in a thread
-            self._transcribe_task = asyncio.create_task(
-                asyncio.to_thread(
-                    self.transcriber.transcribe_async_out, audio_path, stream_handler
-                )
-            )
+
+            async def _run_streaming_transcription():
+                try:
+                    await asyncio.to_thread(
+                        self.transcriber.transcribe_async_out,
+                        audio_path,
+                        stream_handler,
+                    )
+                except Exception as e:
+                    self._set_status(f"Transcription failed: {e}")
+
+            self._transcribe_task = asyncio.create_task(_run_streaming_transcription())
         else:
 
             async def _run_full_transcription():
@@ -205,6 +226,24 @@ class NarrationScreen(Screen):
                     pass
 
         asyncio.create_task(_cleanup())
+
+    @staticmethod
+    def _contains_audio(path: Path) -> bool:
+        """Return whether a WAV contains a non-silent recorded frame.
+
+        A failed/default input device can still produce a perfectly valid WAV
+        header containing only zero samples. Sending that file to a speech
+        model is unsafe: transcription models may hallucinate text for silence.
+        """
+        try:
+            with wave.open(str(path), "rb") as audio:
+                if audio.getnframes() == 0:
+                    return False
+                # The recorder writes PCM16. Checking the raw bytes also avoids
+                # adding a NumPy dependency just to calculate a signal level.
+                return any(audio.readframes(audio.getnframes()))
+        except (OSError, wave.Error):
+            return False
 
     async def _append_transcription(self, chunk: TranscriptionChunk) -> None:
         editor = self.query_one(TextArea)

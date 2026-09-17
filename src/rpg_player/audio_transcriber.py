@@ -158,16 +158,22 @@ class OpenAIAudioTranscriber(AudioTranscriber):
                     **stream_kwargs,
                 )
                 full_text = ""
+                completed_text = ""
                 for event in stream:
                     delta = getattr(event, "delta", None)
-                    # event type could be 'transcript.text.delta' or
-                    # 'transcript.text.done', etc.
-                    # Only handle 'delta' events incrementally
+                    # Delta events are normally emitted for the incremental
+                    # transcript.  Some SDK/API versions only put the text on
+                    # the completed event, however, so retain that as a
+                    # fallback rather than reporting an empty transcription.
                     if delta:
                         full_text += delta
                         handler(file, delta, False)
-                # At the end, report everything with done=True
-                handler(file, full_text, True)
+                    text = getattr(event, "text", None)
+                    if text:
+                        completed_text = text
+                # At the end, report everything with done=True.  A completed
+                # event's text is authoritative when no deltas were supplied.
+                handler(file, full_text or completed_text, True)
         except Exception as e:
             raise RuntimeError("Streaming transcription failed") from e
 
