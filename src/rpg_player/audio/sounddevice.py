@@ -1,4 +1,5 @@
 import logging
+import os
 import queue
 import threading
 import time
@@ -21,7 +22,11 @@ class SoundDeviceRecorder(AudioRecorder):
     """
 
     def __init__(
-        self, samplerate: int = 44100, channels: int = 1, subtype: str = "PCM_16"
+        self,
+        samplerate: int = 44100,
+        channels: int = 1,
+        subtype: str = "PCM_16",
+        device: int | str | None = None,
     ):
         self._thread: threading.Thread | None = None
         self._stop_flag: threading.Event = threading.Event()
@@ -29,6 +34,12 @@ class SoundDeviceRecorder(AudioRecorder):
         self._samplerate: int = samplerate
         self._channels: int = channels
         self._subtype: str = subtype
+        configured_device = (
+            device if device is not None else os.getenv("RPG_PLAYER_INPUT_DEVICE")
+        )
+        if isinstance(configured_device, str) and configured_device.isdigit():
+            configured_device = int(configured_device)
+        self._device: int | str | None = configured_device
         self._start_time: float | None = None
         self._current_path: Path | None = None
 
@@ -51,11 +62,14 @@ class SoundDeviceRecorder(AudioRecorder):
                     channels=self._channels,
                     subtype=self._subtype,
                 ) as file:
-                    with sd.InputStream(
-                        samplerate=self._samplerate,
-                        channels=self._channels,
-                        dtype="int16",
-                    ) as stream:
+                    stream_kwargs: dict[str, object] = {
+                        "samplerate": self._samplerate,
+                        "channels": self._channels,
+                        "dtype": "int16",
+                    }
+                    if self._device is not None:
+                        stream_kwargs["device"] = self._device
+                    with sd.InputStream(**stream_kwargs) as stream:
                         while not self._stop_flag.is_set():
                             data, _ = (
                                 stream.read(  # pyright: ignore[reportUnknownMemberType]
