@@ -4,6 +4,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Callable
 
+from rpg_player.audio.sounddevice import SoundDevicePlayer
 from rpg_player.domain.agent import Agent
 from rpg_player.domain.chat_message import (
     ChatMessage,
@@ -11,7 +12,6 @@ from rpg_player.domain.chat_message import (
     load_messages_from_file,
 )
 
-from .audio_player import SoundDevicePlayer
 from .message_transformer import ChatMessageTransformer
 from .voice_actor import VoiceActorManager
 
@@ -134,7 +134,7 @@ class StateMachine:
 
     def play_audio(self, path: Path):
         log.debug(f"Playing audio: {path}")
-        if self.player.is_playing or self.player.is_paused:
+        if self.player.is_playing:
             self.player.stop_audio()
         _ = self.player.play_file(path)
 

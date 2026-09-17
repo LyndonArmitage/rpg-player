@@ -11,7 +11,8 @@ from textual.logging import TextualHandler
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, Footer, Header, Label, Rule, Select, TextArea
 
-from rpg_player.audio_player import AudioPlayer, SoundDevicePlayer
+from rpg_player.audio.sounddevice import SoundDevicePlayer
+from rpg_player.domain.audio_player import CallbackAudioPlayer
 from rpg_player.domain.chat_message import ChatMessage
 from rpg_player.domain.voice_actor import OutLoudVoiceActor, VoiceActor
 from rpg_player.voice.piper import PiperVoiceActor
@@ -61,10 +62,12 @@ class VoiceActorScreen(Screen):
     }
     """
 
-    def __init__(self, actors: dict[str, VoiceActor], audio_player: AudioPlayer):
+    def __init__(
+        self, actors: dict[str, VoiceActor], audio_player: CallbackAudioPlayer
+    ):
         super().__init__()
         self.actors: dict[str, VoiceActor] = actors
-        self.audio_player: AudioPlayer = audio_player
+        self.audio_player: CallbackAudioPlayer = audio_player
 
         def delete_callback(path: Path):
             path.unlink(missing_ok=True)
@@ -121,7 +124,7 @@ class VoiceActorScreen(Screen):
             actor.speak_message_out_loud(message)
         else:
             audio_path = actor.synthesize(message, self.temp_folder_path)
-            self.audio_player.play_file(audio_path)
+            _ = self.audio_player.play_file(audio_path)
 
 
 class VoiceActorTestApp(App):
@@ -145,7 +148,7 @@ class VoiceActorTestApp(App):
 
 
 if __name__ == "__main__":
-    load_dotenv()
+    _ = load_dotenv()
     logging.getLogger().addHandler(TextualHandler())
     app = VoiceActorTestApp()
-    app.run()
+    _ = app.run()  # pyright: ignore[reportUnknownVariableType]
