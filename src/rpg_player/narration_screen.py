@@ -4,10 +4,12 @@ import asyncio
 import tempfile
 import wave
 from pathlib import Path
+from typing import ClassVar, override
 
 from rich.markdown import Markdown
 from textual import on
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Label, RichLog, TextArea
@@ -18,15 +20,15 @@ from rpg_player.domain.chat_message import ChatMessages
 from rpg_player.domain.transcriber import AudioTranscriber, TranscriptionResult
 
 
-class NarrationScreen(Screen):
-    BINDINGS = [
-        ("ctrl+r", "toggle_record", "Record/Stop"),
-        ("ctrl+j", "accept", "Accept"),
-        ("escape", "cancel", "Cancel"),
-        ("ctrl+k", "clear", "Clear"),
+class NarrationScreen(Screen[None | str]):
+    BINDINGS: list[Binding] = [
+        Binding("ctrl+r", "toggle_record", "Record/Stop"),
+        Binding("ctrl+j", "accept", "Accept"),
+        Binding("escape", "cancel", "Cancel"),
+        Binding("ctrl+k", "clear", "Clear"),
     ]
 
-    CSS = """
+    CSS: ClassVar[str] = """
     #toolbar {
         padding: 0 1;
         height: auto;
@@ -55,20 +57,21 @@ class NarrationScreen(Screen):
         messages: ChatMessages,
     ) -> None:
         super().__init__()
-        self._title = title
-        self._is_recording = False
+        self._title: str = title
+        self._is_recording: bool = False
         self._record_task = None
-        self._chunk_idx = 0
+        self._chunk_idx: int = 0
         self.transcriber: AudioTranscriber = transcriber
         self.recorder: AudioRecorder = SoundDeviceRecorder()
         self.messages: ChatMessages = messages
         # Path to temporary audio file for the current recording
         self._current_audio_path: Path | None = None
         # Task used while recording (starts recorder.start_recording)
-        self._record_task: asyncio.Task | None = self._record_task
+        self._record_task: asyncio.Task | None = None
         # Task used when running transcription (if any)
         self._transcribe_task: asyncio.Task | None = None
 
+    @override
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         with Vertical():
@@ -85,21 +88,21 @@ class NarrationScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.title = self._title
+        self.set_reactive(NarrationScreen.title, self._title)
 
         log: RichLog = self.query_one("#messages", RichLog)
         recent_msg_count = 10
-        log.write(f"{recent_msg_count} recent messages: ")
+        _ = log.write(f"{recent_msg_count} recent messages: ")
         last_n_messages = self.messages.messages[-recent_msg_count:]
         for message in last_n_messages:
             text = f"**{message.author}**: {message.content}"
             md = Markdown(text)
-            log.write(md)
+            _ = log.write(md)
 
         editor: TextArea = self.query_one(TextArea)
         # Don't set any initial text even if self._initial_text is set
         editor.text = ""
-        editor.focus()
+        _ = editor.focus()
 
     async def start_recording_and_transcribe(self) -> None:
         if self._record_task and not self._record_task.done():
@@ -141,7 +144,7 @@ class NarrationScreen(Screen):
 
         # Ensure any recording waiter task is finished
         if self._record_task and not self._record_task.done():
-            self._record_task.cancel()
+            _ = self._record_task.cancel()
             try:
                 await self._record_task
             except asyncio.CancelledError:
@@ -218,7 +221,7 @@ class NarrationScreen(Screen):
                 except Exception:
                     pass
 
-        asyncio.create_task(_cleanup())
+        _ = asyncio.create_task(_cleanup())
 
     @staticmethod
     def _contains_audio(path: Path) -> bool:
@@ -258,7 +261,7 @@ class NarrationScreen(Screen):
         else:
             self._is_recording = False
             if self._record_task and not self._record_task.done():
-                self._record_task.cancel()
+                _ = self._record_task.cancel()
                 try:
                     await self._record_task
                 except asyncio.CancelledError:
@@ -275,10 +278,10 @@ class NarrationScreen(Screen):
 
     def action_accept(self) -> None:
         text = self.query_one(TextArea).text
-        self.dismiss(text)
+        _ = self.dismiss(text)
 
     def action_cancel(self) -> None:
-        self.dismiss(None)
+        _ = self.dismiss(None)
 
     @on(Button.Pressed)
     async def handle_button_pressed(self, event: Button.Pressed) -> None:
@@ -304,7 +307,7 @@ class NarrationScreen(Screen):
         editor = self.query_one(TextArea)
         editor.disabled = locked
         if not locked:
-            editor.focus()
+            _ = editor.focus()
 
     def _set_record_button_label(self, text: str) -> None:
         self.query_one("#btn-record", Button).label = text
