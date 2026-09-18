@@ -4,7 +4,7 @@ import asyncio
 import tempfile
 import wave
 from pathlib import Path
-from typing import ClassVar, override
+from typing import Callable, ClassVar, cast, override
 
 from rich.markdown import Markdown
 from textual import on
@@ -59,7 +59,6 @@ class NarrationScreen(Screen[None | str]):
         super().__init__()
         self._title: str = title
         self._is_recording: bool = False
-        self._record_task = None
         self._chunk_idx: int = 0
         self.transcriber: AudioTranscriber = transcriber
         self.recorder: AudioRecorder = SoundDeviceRecorder()
@@ -67,9 +66,9 @@ class NarrationScreen(Screen[None | str]):
         # Path to temporary audio file for the current recording
         self._current_audio_path: Path | None = None
         # Task used while recording (starts recorder.start_recording)
-        self._record_task: asyncio.Task | None = None
+        self._record_task: asyncio.Task[None] | None = None
         # Task used when running transcription (if any)
-        self._transcribe_task: asyncio.Task | None = None
+        self._transcribe_task: asyncio.Task[None] | None = None
 
     @override
     def compose(self) -> ComposeResult:
@@ -175,7 +174,7 @@ class NarrationScreen(Screen[None | str]):
             try:
                 coro = self._append_transcription(result)
                 # Schedule coroutine safely on the main loop
-                loop.call_soon_threadsafe(lambda: asyncio.create_task(coro))
+                _ = loop.call_soon_threadsafe(lambda: asyncio.create_task(coro))
             except Exception:
                 # swallow handler exceptions to avoid breaking background thread
                 pass
@@ -183,10 +182,13 @@ class NarrationScreen(Screen[None | str]):
         # Run transcription in background so UI remains responsive.  Keep the
         # streaming call inside a coroutine so API errors are displayed rather
         # than becoming an unobserved exception in the cleanup task.
-        transcribe_stream = getattr(self.transcriber, "transcribe_stream", None)
+        transcribe_stream = cast(
+            Callable[[Path, Callable[[TranscriptionResult], None]], None] | None,
+            getattr(self.transcriber, "transcribe_stream", None),
+        )
         if transcribe_stream is not None:
 
-            async def _run_streaming_transcription():
+            async def _run_streaming_transcription() -> None:
                 try:
                     await asyncio.to_thread(
                         transcribe_stream,
@@ -199,7 +201,7 @@ class NarrationScreen(Screen[None | str]):
             self._transcribe_task = asyncio.create_task(_run_streaming_transcription())
         else:
 
-            async def _run_full_transcription():
+            async def _run_full_transcription() -> None:
                 try:
                     result = await asyncio.to_thread(
                         self.transcriber.transcribe, audio_path
@@ -211,7 +213,7 @@ class NarrationScreen(Screen[None | str]):
             self._transcribe_task = asyncio.create_task(_run_full_transcription())
 
         # Cleanup temp file after transcription completes
-        async def _cleanup():
+        async def _cleanup() -> None:
             try:
                 if self._transcribe_task:
                     await self._transcribe_task
