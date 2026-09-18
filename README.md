@@ -90,7 +90,7 @@ from the JSON or TOML configuration file. Below is a simple example
       "prompt_path": "prompts/vex.md",
       "type": "openai",
       "args": {
-        "model": "gpt-5-mini"
+        "model": "gpt-5.6-luna"
       }
     },
     {
@@ -98,7 +98,7 @@ from the JSON or TOML configuration file. Below is a simple example
       "prompt_path": "prompts/garry.md",
       "type": "openai",
       "args": {
-        "model": "gpt-5-mini"
+        "model": "gpt-5.6-luna"
       }
     },
     {
@@ -106,7 +106,7 @@ from the JSON or TOML configuration file. Below is a simple example
       "prompt_path": "prompts/bleb.md",
       "type": "openai",
       "args": {
-        "model": "gpt-5-mini"
+        "model": "gpt-5.6-luna"
       }
     }
   ],
