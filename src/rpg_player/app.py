@@ -68,10 +68,7 @@ class MainApp(App[None]):
         gpt_models: set[str] = set()
         only_using_openai: bool = True
         for agent_conf in config.agents:
-            # TODO: Revist when dealt with config
-            agent = agent_conf.create_agent(  # pyright: ignore[reportUnknownMemberType]
-                config.prompt_config, openai=openai
-            )
+            agent = agent_conf.create_agent(config.prompt_config, openai=openai)
             agents.append(agent)
             if isinstance(agent, OpenAIAgent):
                 gpt_models.add(agent.model)

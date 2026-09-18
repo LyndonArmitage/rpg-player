@@ -1,7 +1,6 @@
 from types import SimpleNamespace
 from typing import cast
 
-import pytest
 from _pytest.logging import LogCaptureFixture
 from openai import OpenAI
 from openai.types.responses.response import Response
@@ -41,19 +40,20 @@ def test_name_and_system_message_are_configured():
     agent = OpenAIAgent(client, "Gandalf", "You are a wise wizard.")
 
     assert agent.name == "Gandalf"
-    assert agent.system_message == (
-        "You are a wise wizard.\n\n" "Your name will show up in messages as: Gandalf"
-    )
-    assert agent.response_kwargs == {
-        "model": "gpt-4.1",
-        "instructions": agent.system_message,
-        "tool_choice": "none",
-        "stream": False,
-        "max_output_tokens": 3000,
+    assert agent.system_prompt == "You are a wise wizard."
+    assert agent.model == "gpt-5.6-luna"
+    assert agent.max_tokens == 3000
+    assert agent.system_message == {
+        "role": "developer",
+        "content": (
+            "You are a wise wizard.\n\n"
+            "Your name will show up in messages as: Gandalf"
+        ),
     }
+    assert agent.reasoning == {"effort": "low"}
 
 
-def test_extra_kwargs_are_added_to_response_request():
+def test_custom_response_configuration_is_set():
     client, _, _ = make_client()
 
     agent = OpenAIAgent(
@@ -61,48 +61,26 @@ def test_extra_kwargs_are_added_to_response_request():
         "Narrator",
         "Describe the scene.",
         model="gpt-5",
-        max_tokens=800,
-        extra_kwargs={"temperature": 0.4, "metadata": {"source": "test"}},
+        max_output_tokens=800,
+        reasoning_effort={"effort": "high"},
+        system_role="system",
     )
 
-    assert agent.response_kwargs["model"] == "gpt-5"
-    assert agent.response_kwargs["max_output_tokens"] == 800
-    assert agent.response_kwargs["temperature"] == 0.4
-    assert agent.response_kwargs["metadata"] == {"source": "test"}
-
-
-@pytest.mark.parametrize(
-    "reserved_key",
-    [
-        "model",
-        "input",
-        "instructions",
-        "tool_choice",
-        "stream",
-        "max_output_tokens",
-    ],
-)
-def test_reserved_extra_kwargs_are_rejected(reserved_key: str):
-    client, _, _ = make_client()
-
-    with pytest.raises(
-        ValueError,
-        match=r"extra_kwargs contains reserved keyword\(s\)",
-    ):
-        _ = OpenAIAgent(
-            client,
-            "Narrator",
-            "Describe the scene.",
-            extra_kwargs={reserved_key: "overridden"},
-        )
+    assert agent.model == "gpt-5"
+    assert agent.max_tokens == 800
+    assert agent.reasoning == {"effort": "high"}
+    assert agent.system_role == "system"
+    assert agent.system_message["role"] == "system"
 
 
 def test_respond_converts_messages_and_returns_speech():
     client, response, responses = make_client("The dragon circles overhead.")
     agent = OpenAIAgent(client, "DM", "Run the adventure.")
     messages = [
+        ChatMessage.system("Rules", "Stay in character."),
         ChatMessage.narration("DM", "A dragon appears."),
         ChatMessage.speech("Rogue", "I draw my bow."),
+        ChatMessage.summary("DM", "The party is in danger."),
     ]
 
     result = agent.respond(messages)
@@ -112,10 +90,23 @@ def test_respond_converts_messages_and_returns_speech():
     assert responses.calls == [
         (
             [
+                {
+                    "role": "developer",
+                    "content": (
+                        "Run the adventure.\n\n"
+                        "Your name will show up in messages as: DM"
+                    ),
+                },
+                {"role": "developer", "content": "Rules: Stay in character."},
                 {"role": "user", "content": "DM: A dragon appears."},
                 {"role": "assistant", "content": "Rogue: I draw my bow."},
+                {"role": "user", "content": "DM: The party is in danger."},
             ],
-            agent.response_kwargs,
+            {
+                "model": "gpt-5.6-luna",
+                "max_output_tokens": 3000,
+                "reasoning": {"effort": "low"},
+            },
         )
     ]
     assert response.output_text == result.content

@@ -1,12 +1,18 @@
 import logging
 from collections.abc import Sequence
-from typing import Any, cast, override
+from typing import Literal, override
 
-from openai import OpenAI
+from openai import Omit, OpenAI
+from openai.types.responses import (
+    EasyInputMessageParam,
+    ResponseInputItemParam,
+    ResponseInputParam,
+)
 from openai.types.responses.response import Response
+from openai.types.shared_params.reasoning import Reasoning
 
 from rpg_player.domain.agent import Agent
-from rpg_player.domain.chat_message import ChatMessage
+from rpg_player.domain.chat_message import ChatMessage, MessageType
 
 
 class OpenAIAgent(Agent):
@@ -17,55 +23,29 @@ class OpenAIAgent(Agent):
     system prompt.
     """
 
-    RESERVED_KEYS: frozenset[str] = frozenset(
-        {
-            "model",
-            "input",
-            "instructions",
-            "tool_choice",
-            "stream",
-            "max_output_tokens",
-        }
-    )
-    """Keyword arguments that are reserved and should not appear in extra_kwargs"""
-
     def __init__(
         self,
         openai: OpenAI,
         name: str,
         system_prompt: str,
-        model: str = "gpt-4.1",
-        max_tokens: int = 3000,
-        extra_kwargs: (
-            dict[str, Any] | None  # pyright: ignore[reportExplicitAny]
-        ) = None,
+        model: str = "gpt-5.6-luna",
+        max_output_tokens: int = 3000,
+        reasoning_effort: Reasoning | None = None,
+        system_role: Literal["developer", "system"] = "developer",
     ):
         self.openai: OpenAI = openai
         self._name: str = name
         self.system_prompt: str = system_prompt
         self.model: str = model
-        self.max_tokens: int = max_tokens
-        self.system_message: str = OpenAIAgent._gen_system_message(system_prompt, name)
+        self.max_tokens: int = max_output_tokens
+        self.system_message: EasyInputMessageParam = OpenAIAgent._gen_system_message(
+            system_role, system_prompt, name
+        )
         self.log: logging.Logger = logging.getLogger(f"OpenAIAgent-{name}")
-
-        extra_kwargs = extra_kwargs or {}
-        intersection = OpenAIAgent.RESERVED_KEYS & extra_kwargs.keys()
-        if intersection:
-            raise ValueError(
-                (
-                    "extra_kwargs contains reserved keyword(s) "
-                    f"that will be overwritten: {sorted(intersection)}"
-                )
-            )
-        # Consolidate static params for responses.create
-        self.response_kwargs: dict[str, Any] = {  # pyright: ignore[reportExplicitAny]
-            "model": model,
-            "instructions": self.system_message,
-            "tool_choice": "none",
-            "stream": False,
-            "max_output_tokens": max_tokens,
-        }
-        self.response_kwargs.update(extra_kwargs)
+        self.reasoning: Reasoning | None = (
+            reasoning_effort if reasoning_effort else Reasoning(effort="low")
+        )
+        self.system_role: Literal["developer", "system"] = system_role
 
     @property
     @override
@@ -73,24 +53,50 @@ class OpenAIAgent(Agent):
         return self._name
 
     @staticmethod
-    def _gen_system_message(prompt: str, name: str) -> str:
+    def _gen_system_message(
+        system_role: Literal["developer", "system"], prompt: str, name: str
+    ) -> EasyInputMessageParam:
         name_reminder = f"Your name will show up in messages as: {name}"
-        return f"{prompt}\n\n{name_reminder}"
+        full_prompt = f"{prompt}\n\n{name_reminder}"
+        return EasyInputMessageParam(role=system_role, content=full_prompt)
+
+    def gen_messages(self, _messages: Sequence[ChatMessage]) -> ResponseInputParam:
+        msgs: list[ResponseInputItemParam] = [self.system_message]
+        for msg in _messages:
+            converted = self._convert_message(msg)
+            msgs.append(converted)
+        return msgs
+
+    def _convert_message(self, msg: ChatMessage) -> EasyInputMessageParam:
+        msg_author: str = msg.author
+        role: Literal["assistant", "user", "system", "developer"] = "assistant"
+        match msg.message_type:
+            case MessageType.SPEECH:
+                role = "assistant"
+            case MessageType.NARRATION:
+                role = "user"
+            case MessageType.SYSTEM:
+                role = self.system_role
+            case MessageType.SUMMARY:
+                role = "assistant"
+                if msg_author == "DM" or msg_author == "GM":
+                    role = "user"
+        output = EasyInputMessageParam(
+            role=role, content=f"{msg_author}: {msg.content}"
+        )
+        return output
 
     @override
     def respond(self, messages: Sequence[ChatMessage]) -> ChatMessage:
-        request_msgs: list[dict[str, str]] = list(
-            map(lambda m: m.as_openai_msg(), messages)
+
+        input: ResponseInputParam | str | Omit = self.gen_messages(messages)
+        response: Response = self.openai.responses.create(
+            model=self.model,
+            input=input,
+            max_output_tokens=self.max_tokens,
+            reasoning=self.reasoning,
         )
 
-        # TODO: Tidy up the casting and pyright ignores here
-        response: Response = cast(
-            Response,
-            self.openai.responses.create(  # pyright: ignore[reportCallIssue]
-                input=request_msgs,  # pyright: ignore[reportArgumentType]
-                **self.response_kwargs,
-            ),
-        )
         output_text = OpenAIAgent._extract_text(response)
         if not output_text:
             self.log.warning(

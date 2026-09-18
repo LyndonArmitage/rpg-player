@@ -3,6 +3,7 @@ import logging
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal, NotRequired, TypedDict, Unpack
 
 from elevenlabs.client import ElevenLabs
 from openai import OpenAI
@@ -53,33 +54,47 @@ class PromptConfig:
     suffix_path: Path
 
 
+class AgentArgs(TypedDict):
+    """ "Configurable agent arguments"""
+
+    model: NotRequired[str]
+    max_output_tokens: NotRequired[int]
+
+
+class OpenAIKwargs(TypedDict):
+    """Required arguments for OpenAI Agents"""
+
+    openai: OpenAI
+
+
 @dataclass
 class AgentConfig:
     name: str
     prompt_path: Path
     type: str
-    args: dict
+    args: AgentArgs
 
-    def create_agent(self, prompt_config: PromptConfig, **kwargs) -> Agent:
+    def create_agent(
+        self, prompt_config: PromptConfig, **kwargs: Unpack[OpenAIKwargs]
+    ) -> Agent:
         match self.type.casefold():
             case "openai":
-                openai: OpenAI | None = kwargs.get("openai")
-                if not openai:
-                    raise ValueError("Missing 'openai' parameter")
-                if not isinstance(openai, OpenAI):
-                    raise ValueError("'openai' is not an OpenAI object")
+                openai: OpenAI = kwargs.get("openai")
                 return self.create_openai(openai, prompt_config, **kwargs)
-        raise NotImplementedError(f"No agent implemented for type {self.type}")
+            case _:
+                raise NotImplementedError(f"No agent implemented for type {self.type}")
 
     def create_openai(
-        self, openai_client: OpenAI, prompt_config: PromptConfig, **kwargs
+        self,
+        openai_client: OpenAI,
+        prompt_config: PromptConfig,
+        **_kwargs: Unpack[AgentArgs],
     ) -> OpenAIAgent:
-        args: dict = {**self.args, **kwargs}
-        model: str = args.get("model", "gpt-5-mini")
-        # Take self.args and create a copy without the reserved keys in it
-        extra_kwargs = {
-            k: v for k, v in self.args.items() if k not in OpenAIAgent.RESERVED_KEYS
-        }
+        model: str = self.args.get("model", "gpt-5.6-luna")
+        max_output_tokens: int = self.args.get("max_output_tokens", 3000)
+        system_role: Literal["system", "developer"] = self.args.get(
+            "system_prompt", "developer"
+        )
 
         prompt_parser = PromptParser({"name": self.name, "model": model})
         prompt_text: str = prompt_parser.parse_prompt_paths(
@@ -89,7 +104,13 @@ class AgentConfig:
         )
 
         return OpenAIAgent(
-            openai_client, self.name, prompt_text, model, extra_kwargs=extra_kwargs
+            openai=openai_client,
+            name=self.name,
+            system_prompt=prompt_text,
+            model=model,
+            max_output_tokens=max_output_tokens,
+            reasoning_effort=None,  # TODO: Make reasoning configurable
+            system_role=system_role,
         )
 
 
