@@ -16,8 +16,7 @@
     "src/rpg_player/config.py",
     "src/rpg_player/app.py",
     "scripts/actor_tester.py",
-    "tests/test_config.py",
-    "tests/conftest.py"
+    "tests/test_config.py"
   ],
   "strict": [
     "src/rpg_player/domain",
