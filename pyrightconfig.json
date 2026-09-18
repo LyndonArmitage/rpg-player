@@ -13,7 +13,6 @@
     "**/__pycache__",
     ".venv",
     "src/rpg_player/config.py",
-    "src/rpg_player/app.py",
     "tests/test_config.py"
   ],
   "strict": [

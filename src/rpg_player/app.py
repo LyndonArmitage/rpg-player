@@ -6,12 +6,12 @@ import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from random import Random
-from typing import Callable, ClassVar, cast, override
+from typing import Callable, ClassVar, TypedDict, cast, override
 
 from dotenv import load_dotenv
 from openai import OpenAI
 from rich.markdown import Markdown
-from textual import on, work
+from textual import getters, on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, VerticalGroup
@@ -35,6 +35,135 @@ from .state_machine import StateMachine
 from .voice_actor import VoiceActorManager
 
 
+class ActorButtonData(TypedDict):
+    index: int
+    name: str
+
+
+class ActorButton(Button):
+    data: ActorButtonData | None = None
+
+
+class MainApp(App[None]):
+    TITLE: str | None = "RPG Party"
+
+    def __init__(self, config_path: Path | None = None):
+        super().__init__()
+        if not config_path:
+            config_path = Path("config.json")
+        self.config_path: Path = config_path
+        self.chat_log_path: Path | None = None
+
+    def on_ready(self) -> None:
+        config_path: Path = self.config_path
+        if not config_path.exists() or not config_path.is_file():
+            raise ValueError(f"No config at {config_path}")
+
+        logger = logging.getLogger(__name__)
+        logger.info(f"Loading from {config_path}")
+        config: Config = Config.from_path(config_path)
+        agents: list[Agent] = []
+        # TODO: Make this neater
+        openai: OpenAI = _get_openai(config)
+        gpt_models: set[str] = set()
+        only_using_openai: bool = True
+        for agent_conf in config.agents:
+            # TODO: Revist when dealt with config
+            agent = agent_conf.create_agent(  # pyright: ignore[reportUnknownMemberType]
+                config.prompt_config, openai=openai
+            )
+            agents.append(agent)
+            if isinstance(agent, OpenAIAgent):
+                gpt_models.add(agent.model)
+            else:
+                only_using_openai = False
+
+        # Set up the system role, since some models use a different role name
+        system_role: str = "system"
+        # Set system role to developer if all models are gpt-5 or more
+        if only_using_openai and all(m.startswith("gpt-5") for m in gpt_models):
+            system_role = "developer"
+
+        voice_actors: VoiceActorManager = VoiceActorManager()
+        for actor_config in config.voice_actors:
+            actor: VoiceActor = actor_config.create_actor(config.api_keys)
+            voice_actors.register_actor(actor)
+
+        messages_path: Path | None = config.messages_path
+        message_listener: Callable[[ChatMessage], None] | None = None
+        if config.text_chat_path:
+            self.chat_log_path = config.text_chat_path
+            message_listener = self.append_message_to_file
+        # TODO: Add transformer to config
+        msg_transformer: ChatMessageTransformer = RemovePrefixMessageTransformer()
+        state_machine: StateMachine = StateMachine(
+            agents,
+            voice_actors,
+            messages_file=messages_path,
+            message_listener=message_listener,
+            system_role=system_role,
+            message_transformer=msg_transformer,
+        )
+
+        if len(state_machine.messages) <= 0:
+            # Add a message with the player names so everyone knows who is present
+            intro_players_msg = ChatMessage.narration(
+                "DM",
+                "The following player characters are present:\n- "
+                + "\n- ".join(state_machine.agent_names),
+            )
+            state_machine.add_message(intro_players_msg)
+
+        transcriber_prompt = (
+            "The following is narration from a Dungeon/Game Master "
+            "for a traditional tabletop role playing game. "
+            "Player character names are:"
+            "\n- "
+        )
+        transcriber_prompt += "\n- ".join([a.name for a in agents])
+        transcriber: AudioTranscriber = OpenAIAudioTranscriber(
+            openai, extra_prompt=transcriber_prompt
+        )
+        standby = Standby(state_machine, transcriber)
+        self.install_screen(  # pyright: ignore[reportUnknownMemberType]
+            standby, "standby"
+        )
+        _ = self.push_screen("standby")
+
+    def append_message_to_file(self, msg: ChatMessage):
+        if not self.chat_log_path:
+            return
+        with self.chat_log_path.open("a+", encoding="utf-8") as f:
+            _ = f.seek(0, 2)  # move to end of file
+            if f.tell() > 0:  # file not empty
+                _ = f.write("\n")
+            _ = f.write(f"{msg.author}: {msg.content}")
+
+
+def _get_openai(config: Config) -> OpenAI:
+    api_keys = config.api_keys
+    if api_keys:
+        return api_keys.get_openai_client()
+    else:
+        openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
+        return OpenAI(api_key=openai_api_key)
+
+
+def setup_logging(level: int = logging.INFO, logfile: str | None = None) -> None:
+    handlers: list[logging.Handler] = [TextualHandler()]
+    if logfile:
+        file_handler = RotatingFileHandler(
+            logfile, maxBytes=10_000_000, backupCount=3, encoding="utf-8"
+        )
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+        )
+        handlers.append(file_handler)
+    logging.basicConfig(level=level, handlers=handlers, force=True)
+    logging.captureWarnings(True)
+
+
 class Standby(Screen[None]):
     TITLE: ClassVar[str | None] = "RPG Party"
     SUB_TITLE: ClassVar[str | None] = "Standby"
@@ -47,6 +176,7 @@ class Standby(Screen[None]):
         Binding("a", "random_respond", "Random Respond"),
         Binding("r", "random_not_last_respond", "Not Last Respond"),
     ]
+    app: getters.app[MainApp] = getters.app(MainApp)
 
     def __init__(self, state_machine: StateMachine, transcriber: AudioTranscriber):
         super().__init__()
@@ -66,7 +196,9 @@ class Standby(Screen[None]):
         with Horizontal(id="buttons"):
             yield Button("Narrate", id="narrate")
             for i, agent_name in enumerate(self.agent_names):
-                btn = Button(f"{i + 1}: {agent_name}", id=f"agent{i}", classes="agent")
+                btn = ActorButton(
+                    f"{i + 1}: {agent_name}", id=f"agent{i}", classes="agent"
+                )
                 btn.data = {"index": i, "name": agent_name}
                 yield btn
             yield Button("Random Respond", id="random")
@@ -88,9 +220,11 @@ class Standby(Screen[None]):
 
     @on(Button.Pressed, "#buttons .agent")
     def handle_agent(self, event: Button.Pressed):
-        info = getattr(event.button, "data", {}) or {}
-        index = info.get("index")
-        self.action_agent_respond(index)
+        btn: ActorButton = cast(ActorButton, event.button)
+        info = btn.data
+        if info:
+            index = info.get("index")
+            self.action_agent_respond(index)
 
     @on(Button.Pressed, "#buttons #random")
     def handle_random(self, _: Button.Pressed) -> None:
@@ -128,7 +262,7 @@ class Standby(Screen[None]):
         if self._disable_bindings.is_set():
             return
 
-        def on_narrate_done(result: str):
+        def on_narrate_done(result: str | None):
             if result:
                 result = result.strip()
                 message = ChatMessage.narration("DM", result)
@@ -142,10 +276,10 @@ class Standby(Screen[None]):
             transcriber=self.transcriber,
             messages=self.state_machine.messages,
         )
-        self.app.push_screen(narrate_screen, on_narrate_done)
+        _ = self.app.push_screen(narrate_screen, on_narrate_done)
 
     def action_agent_respond(self, index: int) -> None:
-        self.agent_respond_async(index)
+        _ = self.agent_respond_async(index)
 
     @work(exclusive=True, group="agent", exit_on_error=False)
     async def agent_respond_async(self, number: int):
@@ -164,7 +298,7 @@ class Standby(Screen[None]):
         text = f"**{msg.author}:** {msg.content}"
         self.add_message(text)
 
-        speak_switch: Switch = self.query_one("#speak-switch")
+        speak_switch: Switch = cast(Switch, self.query_one("#speak-switch"))
         should_speak: bool = speak_switch.value
 
         if should_speak:
@@ -202,11 +336,12 @@ class Standby(Screen[None]):
     def add_message(self, text: str) -> None:
         log: RichLog = self.query_one("#messages", RichLog)
         md = Markdown(text)
-        log.write(md, shrink=False)
+        _ = log.write(md, shrink=False)
         self.rendered_messages.append(md)
 
     def _update_label(self, text: str) -> None:
-        self.query_one("#status").update(text)
+        label = cast(Label, self.query_one("#status"))
+        label.update(text)
 
     def _disable_responses(self) -> None:
         self._toggle_responses(True)
@@ -224,121 +359,6 @@ class Standby(Screen[None]):
         self.query_one("#buttons #narrate").disabled = disabled
         self.query_one("#buttons #random").disabled = disabled
         self.query_one("#buttons #not-last").disabled = disabled
-
-
-class MainApp(App[None]):
-    TITLE: str | None = "RPG Party"
-
-    def __init__(self, config_path: Path | None = None):
-        super().__init__()
-        if not config_path:
-            config_path = Path("config.json")
-        self.config_path: Path = config_path
-        self.chat_log_path: Path | None = None
-
-    def on_ready(self) -> None:
-        config_path: Path = self.config_path
-        if not config_path.exists() or not config_path.is_file():
-            raise ValueError(f"No config at {config_path}")
-
-        logger = logging.getLogger(__name__)
-        logger.info(f"Loading from {config_path}")
-        config: Config = Config.from_path(config_path)
-        agents: list[Agent] = []
-        # TODO: Make this neater
-        openai: OpenAI = _get_openai(config)
-        gpt_models: set[str] = set()
-        only_using_openai: bool = True
-        for agent_conf in config.agents:
-            agent = agent_conf.create_agent(config.prompt_config, openai=openai)
-            agents.append(agent)
-            if isinstance(agent, OpenAIAgent):
-                gpt_models.add(agent.model)
-            else:
-                only_using_openai = False
-
-        # Set up the system role, since some models use a different role name
-        system_role: str = "system"
-        # Set system role to developer if all models are gpt-5 or more
-        if only_using_openai and all(m.startswith("gpt-5") for m in gpt_models):
-            system_role = "developer"
-
-        voice_actors: VoiceActorManager = VoiceActorManager()
-        for actor_config in config.voice_actors:
-            actor: VoiceActor = actor_config.create_actor(config.api_keys)
-            voice_actors.register_actor(actor)
-
-        messages_path: Path | None = config.messages_path
-        message_listener: Callable[[ChatMessage], None] | None = None
-        if config.text_chat_path:
-            self.chat_log_path = config.text_chat_path
-            message_listener = self.append_message_to_file
-        # TODO: Add transformer to config
-        msg_transformer: ChatMessageTransformer = RemovePrefixMessageTransformer()
-        self.state_machine: StateMachine = StateMachine(
-            agents,
-            voice_actors,
-            messages_file=messages_path,
-            message_listener=message_listener,
-            system_role=system_role,
-            message_transformer=msg_transformer,
-        )
-
-        if len(self.state_machine.messages) <= 0:
-            # Add a message with the player names so everyone knows who is present
-            intro_players_msg = ChatMessage.narration(
-                "DM",
-                "The following player characters are present:\n- "
-                + "\n- ".join(self.state_machine.agent_names),
-            )
-            self.state_machine.add_message(intro_players_msg)
-
-        transcriber_prompt = (
-            "The following is narration from a Dungeon/Game Master "
-            "for a traditional tabletop role playing game. "
-            "Player character names are:"
-            "\n- "
-            "\n- ".join([a.name for a in agents])
-        )
-        transcriber: AudioTranscriber = OpenAIAudioTranscriber(
-            openai, extra_prompt=transcriber_prompt
-        )
-        standby = Standby(self.state_machine, transcriber)
-        self.install_screen(standby, "standby")
-        self.push_screen("standby")
-
-    def append_message_to_file(self, msg: ChatMessage):
-        if not self.chat_log_path:
-            return
-        with self.chat_log_path.open("a+", encoding="utf-8") as f:
-            _ = f.seek(0, 2)  # move to end of file
-            if f.tell() > 0:  # file not empty
-                _ = f.write("\n")
-            _ = f.write(f"{msg.author}: {msg.content}")
-
-
-def _get_openai(config: Config) -> OpenAI:
-    api_keys = config.api_keys
-    if api_keys:
-        return api_keys.get_openai_client()
-    else:
-        openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
-        return OpenAI(api_key=openai_api_key)
-
-
-def setup_logging(level: int = logging.INFO, logfile: str | None = None) -> None:
-    handlers: list[logging.Handler] = [TextualHandler()]
-    if logfile:
-        file_handler = RotatingFileHandler(
-            logfile, maxBytes=10_000_000, backupCount=3, encoding="utf-8"
-        )
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(
-            logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-        )
-        handlers.append(file_handler)
-    logging.basicConfig(level=level, handlers=handlers, force=True)
-    logging.captureWarnings(True)
 
 
 if __name__ == "__main__":
