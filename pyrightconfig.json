@@ -11,9 +11,7 @@
   ],
   "exclude": [
     "**/__pycache__",
-    ".venv",
-    "src/rpg_player/config.py",
-    "tests/test_config.py"
+    ".venv"
   ],
   "strict": [
     "src/rpg_player/domain",

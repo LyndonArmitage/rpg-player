@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from rpg_player.config import (
     AgentConfig,
     APIKeys,
@@ -8,7 +10,7 @@ from rpg_player.config import (
     VoiceActorConfig,
 )
 
-TEST_DATA: dict = {
+TEST_DATA: dict[str, object] = {
     "prompt_config": {
         "prefix_path": "foo/prefix.txt",
         "suffix_path": "foo/suffix.txt",
@@ -42,7 +44,7 @@ def test_from_dict():
     assert config.prompt_config.suffix_path == Path("foo/suffix.txt")
     assert config.messages_path == Path("foo/messages.json")
     assert isinstance(config.api_keys, APIKeys)
-    assert config.api_keys and config.api_keys.openai == "testkey"
+    assert config.api_keys.openai == "testkey"
 
     assert len(config.agents) == 1
     agent = config.agents[0]
@@ -58,3 +60,29 @@ def test_from_dict():
     assert va.type == "piper"
     assert va.speakers == ["Foo", "Bar"]
     assert va.args == {"speaker_ids": {"Foo": 1, "Bar": 2}}
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("prompt_config", {}, "prompt_config.prefix_path"),
+        (
+            "agents",
+            [{"name": "Foo", "prompt_path": "foo.md", "type": "unknown"}],
+            "Unsupported agent type",
+        ),
+        (
+            "voice_actors",
+            [{"type": "unknown"}],
+            "Unsupported voice actor type",
+        ),
+    ],
+)
+def test_from_dict_rejects_invalid_configuration(
+    field: str, value: object, message: str
+):
+    data = dict(TEST_DATA)
+    data[field] = value
+
+    with pytest.raises((TypeError, ValueError), match=message):
+        _ = Config.from_dict(data)
