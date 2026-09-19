@@ -1,6 +1,6 @@
 [project]
 name = "rpg-player"
-version = "0.1.0"
+version = "0.2.0"
 description = "A small toy project for playing & narrating RPG-style messages"
 readme = "README.md"
 requires-python = ">=3.13"
