@@ -2,7 +2,7 @@
 import logging
 import tempfile
 from pathlib import Path
-from typing import Dict, List
+from typing import ClassVar, cast, override
 
 from dotenv import load_dotenv
 from textual import on
@@ -12,10 +12,11 @@ from textual.logging import TextualHandler
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, Footer, Header, Label, Rule, Select, TextArea
 
-from rpg_player.audio_player import AudioPlayer, SoundDevicePlayer
-from rpg_player.chat_message import ChatMessage
-from rpg_player.piper_voice_actor import PiperVoiceActor
-from rpg_player.voice_actor import VoiceActor
+from rpg_player.audio.sounddevice import SoundDevicePlayer
+from rpg_player.domain.audio_player import CallbackAudioPlayer
+from rpg_player.domain.chat_message import ChatMessage
+from rpg_player.domain.voice_actor import OutLoudVoiceActor, VoiceActor
+from rpg_player.voice.piper import PiperVoiceActor
 
 
 class ChooseSpeakerId(ModalScreen[str]):
@@ -23,10 +24,11 @@ class ChooseSpeakerId(ModalScreen[str]):
     Simple dialog screen for picking the speaker id
     """
 
-    def __init__(self, speaker_ids: List[str]):
+    def __init__(self, speaker_ids: list[str]):
         super().__init__()
-        self.speaker_ids = speaker_ids
+        self.speaker_ids: list[str] = speaker_ids.copy()
 
+    @override
     def compose(self) -> ComposeResult:
         with VerticalScroll():
             yield Label("Choose a Speaker:")
@@ -36,15 +38,19 @@ class ChooseSpeakerId(ModalScreen[str]):
 
     @on(Select.Changed)
     def select_changed(self, event: Select.Changed) -> None:
-        self.title = str(event.value)
-        self.dismiss(event.value)
+        value = event.value
+        _ = self.dismiss(value if isinstance(value, str) else None)
 
 
-class VoiceActorScreen(Screen):
-    TITLE = "Voice Actor Test"
-    SUB_TITLE = "Test your voices"
+class ActorButton(Button):
+    data: dict[str, str] | None = None
 
-    CSS = """
+
+class VoiceActorScreen(Screen[None]):
+    TITLE: ClassVar[str | None] = "Voice Actor Test"
+    SUB_TITLE: ClassVar[str | None] = "Test your voices"
+
+    CSS: ClassVar[str] = """
     #actor_buttons {
         padding: 0 1;
         height: auto;
@@ -62,21 +68,24 @@ class VoiceActorScreen(Screen):
     }
     """
 
-    def __init__(self, actors: Dict[str, VoiceActor], audio_player: AudioPlayer):
+    def __init__(
+        self, actors: dict[str, VoiceActor], audio_player: CallbackAudioPlayer
+    ):
         super().__init__()
-        self.actors: Dict[str, VoiceActor] = actors
-        self.audio_player: AudioPlayer = audio_player
+        self.actors: dict[str, VoiceActor] = actors
+        self.audio_player: CallbackAudioPlayer = audio_player
 
         def delete_callback(path: Path):
             path.unlink(missing_ok=True)
 
         self.audio_player.register_finished_callback(delete_callback)
 
-        self._tmp: tempfile.TemporaryDirectory = tempfile.TemporaryDirectory(
+        self._tmp: tempfile.TemporaryDirectory[str] = tempfile.TemporaryDirectory(
             prefix="rpg-test-voices"
         )
         self.temp_folder_path: Path = Path(self._tmp.name)
 
+    @override
     def compose(self) -> ComposeResult:
         yield Header()
         yield Label("Type example message below:")
@@ -85,7 +94,9 @@ class VoiceActorScreen(Screen):
         yield Label("Test Voice Actors:")
         with HorizontalScroll(id="actor_buttons"):
             for name, actor in self.actors.items():
-                btn = Button(f"{actor.__class__.__name__}:\n{name}", classes="actor")
+                btn = ActorButton(
+                    f"{actor.__class__.__name__}:\n{name}", classes="actor"
+                )
                 btn.data = {"name": name}
                 yield btn
         yield Label("Not tested anything yet", id="test_label")
@@ -94,16 +105,20 @@ class VoiceActorScreen(Screen):
     def on_mout(self) -> None:
         editor: TextArea = self.query_one(TextArea)
         editor.cursor_location = editor.document.end
-        editor.focus()
+        _ = editor.focus()
 
     @on(Button.Pressed, "#actor_buttons .actor")
     async def handle_speak_button(self, event: Button.Pressed) -> None:
-        info = getattr(event.button, "data", {}) or {}
-        name: str = info.get("name")
+        if not isinstance(event.button, ActorButton):
+            return
+        if event.button.data is None:
+            return
+        name = event.button.data["name"]
         actor: VoiceActor = self.actors[name]
         if len(actor.speaker_names) > 1:
             speaker_names = sorted(actor.speaker_names)
-            self.app.push_screen(
+            app = cast(VoiceActorTestApp, self.app)
+            _ = app.push_screen(
                 ChooseSpeakerId(speaker_names),
                 lambda result: self._after_choice(result, actor, name),
             )
@@ -116,20 +131,20 @@ class VoiceActorScreen(Screen):
         text_area: TextArea = self.query_one(TextArea)
         text: str = text_area.text
         message = ChatMessage.speech(result, text)
-        label: Label = self.query_one("#test_label")
+        label = cast(Label, self.query_one("#test_label"))
         label.update(f"Played: {name} with speaker id {result}")
-        if actor.can_speak_out_loud:
-            actor.speak_message_out_load(message)
+        if isinstance(actor, OutLoudVoiceActor):
+            actor.speak_message_out_loud(message)
         else:
-            audio_path = actor.speak_message(message, self.temp_folder_path)
-            self.audio_player.play_file(audio_path)
+            audio_path = actor.synthesize(message, self.temp_folder_path)
+            _ = self.audio_player.play_file(audio_path)
 
 
-class VoiceActorTestApp(App):
-    TITLE = "Voice Actor Test App"
+class VoiceActorTestApp(App[None]):
+    TITLE: str | None = "Voice Actor Test App"
 
     def on_ready(self) -> None:
-        actors: Dict[str, VoiceActor] = {}
+        actors: dict[str, VoiceActor] = {}
         actor1 = PiperVoiceActor.with_all_speaker_ids(
             "piper-models/en_US-lessac-medium.onnx"
         )
@@ -141,12 +156,14 @@ class VoiceActorTestApp(App):
 
         audio_player = SoundDevicePlayer()
         va_screen = VoiceActorScreen(actors, audio_player)
-        self.install_screen(va_screen, "va")
-        self.push_screen("va")
+        _ = self.install_screen(  # pyright: ignore[reportUnknownMemberType]
+            va_screen, "va"
+        )
+        _ = self.push_screen("va")
 
 
 if __name__ == "__main__":
-    load_dotenv()
+    _ = load_dotenv()
     logging.getLogger().addHandler(TextualHandler())
     app = VoiceActorTestApp()
-    app.run()
+    _ = app.run()

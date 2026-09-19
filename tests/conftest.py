@@ -1,8 +1,13 @@
 # conftest.py
-import time
+from __future__ import annotations
+
 import wave
 from pathlib import Path
+
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
+
+from tests.audio_fakes import FakeOutputStream
 
 
 # ---- create a tiny WAV file (44.1 kHz mono, PCM16) without numpy ----
@@ -21,29 +26,9 @@ def temp_wav(tmp_path: Path) -> Path:
     return path
 
 
-# ---- fake OutputStream that just "accepts" writes ----
-class FakeOutputStream:
-    def __init__(self, samplerate, channels, sleep_per_write=0.005):
-        self.samplerate = samplerate
-        self.channels = channels
-        self.sleep_per_write = sleep_per_write
-        self.closed = False
-        self.total_frames = 0
+@pytest.fixture(autouse=True)
+def fake_output_stream(monkeypatch: MonkeyPatch) -> None:
+    FakeOutputStream.instances.clear()
+    import sounddevice as sd  # pyright: ignore[reportMissingTypeStubs]
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        self.closed = True
-
-    def write(self, block):
-        # Simulate time passing per block and count frames
-        self.total_frames += len(block)
-        time.sleep(self.sleep_per_write)
-
-
-@pytest.fixture
-def patch_sounddevice(monkeypatch):
-    import sounddevice as sd
-
-    monkeypatch.setattr(sd, "OutputStream", FakeOutputStream)
+    monkeypatch.setattr(sd, "RawOutputStream", FakeOutputStream)

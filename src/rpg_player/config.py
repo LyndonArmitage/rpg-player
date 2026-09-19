@@ -1,26 +1,29 @@
 import json
 import logging
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Literal, NotRequired, TypedDict, Unpack, cast
 
 from elevenlabs.client import ElevenLabs
 from openai import OpenAI
 
-from .agent import Agent, OpenAIAgent
-from .basic_voice_actor import BasicVoiceActor
-from .elevenlabs_voice_actor import ElevenlabsVoiceActor
-from .openai_voice_actor import OpenAIVoiceActor
-from .piper_voice_actor import PiperVoiceActor
+from rpg_player.agents.openai import OpenAIAgent
+from rpg_player.domain.agent import Agent
+from rpg_player.domain.voice_actor import VoiceActor
+from rpg_player.voice.basic import BasicVoiceActor
+from rpg_player.voice.elevenlabs import ElevenlabsVoiceActor
+from rpg_player.voice.openai import OpenAIVoiceActor
+from rpg_player.voice.piper import PiperVoiceActor
+
 from .prompt_parser import PromptParser
-from .voice_actor import VoiceActor
 
 
 @dataclass
 class APIKeys:
-    openai: Optional[str] = None
-    elevenlabs: Optional[str] = None
+    openai: str | None = None
+    elevenlabs: str | None = None
 
     def get_openai_client(self) -> OpenAI:
         """
@@ -52,33 +55,66 @@ class PromptConfig:
     suffix_path: Path
 
 
+class AgentArgs(TypedDict):
+    """ "Configurable agent arguments"""
+
+    model: NotRequired[str]
+    max_output_tokens: NotRequired[int]
+    system_role: NotRequired[Literal["system", "developer"]]
+
+
+class PiperArgs(TypedDict):
+    model_path: str
+    speaker_ids: NotRequired[dict[str, int]]
+
+
+class ElevenlabsArgs(TypedDict):
+    voice_id: str
+    model_id: NotRequired[str]
+
+
+class OpenAIVoiceArgs(TypedDict, total=False):
+    model: str
+    voice: str
+    response_format: str
+    instructions: str
+
+
+class OpenAIKwargs(TypedDict):
+    """Required arguments for OpenAI Agents"""
+
+    openai: OpenAI
+
+
+AgentType = Literal["openai"]
+
+
 @dataclass
 class AgentConfig:
     name: str
     prompt_path: Path
-    type: str
-    args: dict
+    type: AgentType
+    args: AgentArgs
 
-    def create_agent(self, prompt_config: PromptConfig, **kwargs) -> Agent:
-        match self.type.casefold():
+    def create_agent(
+        self, prompt_config: PromptConfig, **kwargs: Unpack[OpenAIKwargs]
+    ) -> Agent:
+        match self.type:
             case "openai":
-                openai: Optional[OpenAI] = kwargs.get("openai")
-                if not openai:
-                    raise ValueError("Missing 'openai' parameter")
-                if not isinstance(openai, OpenAI):
-                    raise ValueError("'openai' is not an OpenAI object")
+                openai: OpenAI = kwargs.get("openai")
                 return self.create_openai(openai, prompt_config, **kwargs)
-        raise NotImplementedError(f"No agent implemented for type {self.type}")
 
     def create_openai(
-        self, openai_client: OpenAI, prompt_config: PromptConfig, **kwargs
+        self,
+        openai_client: OpenAI,
+        prompt_config: PromptConfig,
+        **_kwargs: Unpack[AgentArgs],
     ) -> OpenAIAgent:
-        args: dict = {**self.args, **kwargs}
-        model: str = args.get("model", "gpt-5-mini")
-        # Take self.args and create a copy without the reserved keys in it
-        extra_kwargs = {
-            k: v for k, v in self.args.items() if k not in OpenAIAgent.RESERVED_KEYS
-        }
+        model: str = self.args.get("model", "gpt-5.6-luna")
+        max_output_tokens: int = self.args.get("max_output_tokens", 3000)
+        system_role: Literal["system", "developer"] = self.args.get(
+            "system_role", "developer"
+        )
 
         prompt_parser = PromptParser({"name": self.name, "model": model})
         prompt_text: str = prompt_parser.parse_prompt_paths(
@@ -88,18 +124,27 @@ class AgentConfig:
         )
 
         return OpenAIAgent(
-            openai_client, self.name, prompt_text, model, extra_kwargs=extra_kwargs
+            openai=openai_client,
+            name=self.name,
+            system_prompt=prompt_text,
+            model=model,
+            max_output_tokens=max_output_tokens,
+            reasoning_effort=None,  # TODO: Make reasoning configurable
+            system_role=system_role,
         )
+
+
+VoiceActorType = Literal["piper", "elevenlabs", "openai", "basic"]
 
 
 @dataclass
 class VoiceActorConfig:
-    type: str
-    speakers: List[str]
-    args: dict
+    type: VoiceActorType
+    speakers: list[str]
+    args: dict[str, object]
 
-    def create_actor(self, api_keys: Optional[APIKeys]) -> VoiceActor:
-        match self.type.casefold():
+    def create_actor(self, api_keys: APIKeys | None) -> VoiceActor:
+        match self.type:
             case "piper":
                 return self._create_piper_actor()
             case "elevenlabs":
@@ -108,32 +153,27 @@ class VoiceActorConfig:
                 return self._create_openai_actor(api_keys)
             case "basic":
                 return self._create_basic_actor()
-        raise NotImplementedError(f"Not implemented for type: {self.type}")
 
     def _create_piper_actor(self) -> PiperVoiceActor:
-        args: dict = self.args
-        model_path: str = args.get("model_path")
+        args = cast(PiperArgs, cast(object, self.args))
+        model_path = args.get("model_path")
         if not model_path:
             raise ValueError("Missing 'model_path' from args")
         actor = PiperVoiceActor(self.speakers, Path(model_path))
-        speaker_ids: Dict[str, int] = args.get("speaker_ids", {})
+        speaker_ids = args.get("speaker_ids", {})
         for name, speaker_id in speaker_ids.items():
             actor.set_speaker_id_for(name, speaker_id)
         return actor
 
     def _create_elevenlabs_actor(
-        self, api_keys: Optional[APIKeys]
+        self, api_keys: APIKeys | None
     ) -> ElevenlabsVoiceActor:
-        client: ElevenLabs = None
-        if api_keys:
-            client = api_keys.get_elevenlabs_client()
-        else:
-            client = ElevenLabs()
-        args: dict = self.args
-        voice_id: Optional[str] = args.get("voice_id")
+        client = api_keys.get_elevenlabs_client() if api_keys else ElevenLabs()
+        args = cast(ElevenlabsArgs, cast(object, self.args))
+        voice_id = args.get("voice_id")
         if not voice_id:
             raise ValueError("Missing 'voice_id' from args")
-        model_id: Optional[str] = args.get("model_id")
+        model_id = args.get("model_id")
         if not model_id:
             return ElevenlabsVoiceActor(self.speakers, client, voice_id)
         else:
@@ -141,13 +181,9 @@ class VoiceActorConfig:
                 self.speakers, client, voice_id, model_id=model_id
             )
 
-    def _create_openai_actor(self, api_keys: Optional[APIKeys]) -> OpenAIVoiceActor:
-        client: OpenAI = None
-        if api_keys:
-            client = api_keys.get_openai_client()
-        else:
-            client = OpenAI()
-        args: dict = self.args
+    def _create_openai_actor(self, api_keys: APIKeys | None) -> OpenAIVoiceActor:
+        client = api_keys.get_openai_client() if api_keys else OpenAI()
+        args = cast(OpenAIVoiceArgs, cast(object, self.args))
         return OpenAIVoiceActor(self.speakers, client, **args)
 
     def _create_basic_actor(self) -> BasicVoiceActor:
@@ -161,67 +197,126 @@ class Config:
     """
 
     prompt_config: PromptConfig
-    messages_path: Optional[Path] = None
-    api_keys: Optional[APIKeys] = None
-    agents: List[AgentConfig] = field(default_factory=list)
-    voice_actors: List[VoiceActorConfig] = field(default_factory=list)
-    text_chat_path: Optional[Path] = None
+    messages_path: Path | None = None
+    api_keys: APIKeys | None = None
+    agents: list[AgentConfig] = field(default_factory=list)
+    voice_actors: list[VoiceActorConfig] = field(default_factory=list)
+    text_chat_path: Path | None = None
 
     @staticmethod
-    def from_dict(data: dict) -> "Config":
+    def from_dict(data: Mapping[str, object]) -> "Config":
         """
         Load configuration from a dictionary object
         """
 
-        def path_or_none(val) -> Optional[Path]:
+        def object_mapping(value: object, name: str) -> Mapping[str, object]:
+            if not isinstance(value, Mapping):
+                raise TypeError(f"{name} must be an object")
+            return cast(Mapping[str, object], value)
+
+        def required_string(value: object, name: str) -> str:
+            if not isinstance(value, str) or not value:
+                raise ValueError(f"{name} must be a non-empty string")
+            return value
+
+        def path_or_none(val: object, name: str) -> Path | None:
             if val is None:
                 return None
-            return Path(val)
+            return Path(required_string(val, name))
 
-        def parse_prompt_config(d: dict) -> PromptConfig:
+        def parse_prompt_config(d: Mapping[str, object]) -> PromptConfig:
             return PromptConfig(
-                prefix_path=Path(d["prefix_path"]),
-                suffix_path=Path(d["suffix_path"]),
+                prefix_path=Path(
+                    required_string(d.get("prefix_path"), "prompt_config.prefix_path")
+                ),
+                suffix_path=Path(
+                    required_string(d.get("suffix_path"), "prompt_config.suffix_path")
+                ),
             )
 
-        def parse_api_keys(d: dict) -> APIKeys:
-            return APIKeys(openai=d.get("openai"), elevenlabs=d.get("elevenlabs"))
+        def parse_api_keys(d: Mapping[str, object]) -> APIKeys:
+            keys: dict[str, str | None] = {}
+            for name in ("openai", "elevenlabs"):
+                value = d.get(name)
+                if value is not None and not isinstance(value, str):
+                    raise TypeError(f"api_keys.{name} must be a string")
+                keys[name] = value
+            return APIKeys(**keys)
 
-        def parse_agent(d: dict) -> AgentConfig:
+        def parse_agent_type(value: object) -> AgentType:
+            value = required_string(value, "agents.type").casefold()
+            if value != "openai":
+                raise ValueError(f"Unsupported agent type: {value}")
+            return value
+
+        def parse_voice_actor_type(value: object) -> VoiceActorType:
+            value = required_string(value, "voice_actors.type").casefold()
+            valid_types = {"piper", "elevenlabs", "openai", "basic"}
+            if value not in valid_types:
+                raise ValueError(f"Unsupported voice actor type: {value}")
+            return cast(VoiceActorType, value)
+
+        def parse_agent(d: Mapping[str, object]) -> AgentConfig:
+            args = object_mapping(d.get("args", {}), "agents.args")
             return AgentConfig(
-                name=d["name"],
-                prompt_path=Path(d["prompt_path"]),
-                type=d["type"],
-                args=dict(d.get("args", {})),
+                name=required_string(d.get("name"), "agents.name"),
+                prompt_path=Path(
+                    required_string(d.get("prompt_path"), "agents.prompt_path")
+                ),
+                type=parse_agent_type(d.get("type")),
+                args=cast(AgentArgs, cast(object, dict(args))),
             )
 
-        def parse_voice_actor(d: dict) -> VoiceActorConfig:
+        def parse_voice_actor(d: Mapping[str, object]) -> VoiceActorConfig:
+            raw_speakers = d.get("speakers", [])
+            if not isinstance(raw_speakers, list):
+                raise TypeError("voice_actors.speakers must be a list of strings")
+            speakers = cast(list[object], raw_speakers)
+            if not all(isinstance(speaker, str) for speaker in speakers):
+                raise TypeError("voice_actors.speakers must be a list of strings")
+            args = object_mapping(d.get("args", {}), "voice_actors.args")
             return VoiceActorConfig(
-                type=d["type"],
-                speakers=list(d.get("speakers", [])),
-                args=dict(d.get("args", {})),
+                type=parse_voice_actor_type(d.get("type")),
+                speakers=cast(list[str], speakers),
+                args=dict(args),
             )
+
+        prompt_config = object_mapping(data.get("prompt_config"), "prompt_config")
+        api_keys = data.get("api_keys")
+        raw_agents = data.get("agents", [])
+        raw_voice_actors = data.get("voice_actors", [])
+        if not isinstance(raw_agents, list):
+            raise TypeError("agents must be a list")
+        if not isinstance(raw_voice_actors, list):
+            raise TypeError("voice_actors must be a list")
+        raw_agents = cast(list[object], raw_agents)
+        raw_voice_actors = cast(list[object], raw_voice_actors)
 
         return Config(
-            prompt_config=parse_prompt_config(data["prompt_config"]),
-            messages_path=path_or_none(data.get("messages_path")),
+            prompt_config=parse_prompt_config(prompt_config),
+            messages_path=path_or_none(data.get("messages_path"), "messages_path"),
             api_keys=(
-                parse_api_keys(data["api_keys"])
-                if data.get("api_keys") is not None
+                parse_api_keys(object_mapping(api_keys, "api_keys"))
+                if api_keys is not None
                 else None
             ),
-            agents=[parse_agent(agent) for agent in data.get("agents", [])],
-            voice_actors=[parse_voice_actor(v) for v in data.get("voice_actors", [])],
-            text_chat_path=path_or_none(data.get("text_chat_path")),
+            agents=[
+                parse_agent(object_mapping(agent, "agents[]")) for agent in raw_agents
+            ],
+            voice_actors=[
+                parse_voice_actor(object_mapping(actor, "voice_actors[]"))
+                for actor in raw_voice_actors
+            ],
+            text_chat_path=path_or_none(data.get("text_chat_path"), "text_chat_path"),
         )
 
     @staticmethod
-    def from_path(path: Union[Path, str]) -> "Config":
+    def from_path(path: Path | str) -> "Config":
         """
         Load configuration from a given path
         """
         if isinstance(path, str):
-            path = Path(str)
+            path = Path(path)
         if not path.exists():
             raise ValueError(f"path does not exist: {path}")
         if not path.is_file():
@@ -229,8 +324,11 @@ class Config:
         extension: str = path.suffix.casefold()
         match extension:
             case ".json":
-                return Config.from_dict(json.loads(path.read_text()))
+                return Config.from_dict(
+                    cast(dict[str, object], json.loads(path.read_text()))
+                )
             case ".toml":
                 return Config.from_dict(tomllib.loads(path.read_text()))
-
+            case _:
+                pass
         raise ValueError(f"path was not a valid config file: {path}")

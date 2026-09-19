@@ -2,37 +2,33 @@ from __future__ import annotations
 
 import asyncio
 import tempfile
-from dataclasses import dataclass
+import wave
 from pathlib import Path
-from typing import Optional
+from typing import Callable, ClassVar, cast, override
 
 from rich.markdown import Markdown
 from textual import on
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Label, RichLog, TextArea
 
-from .audio_recorder import AudioRecorder, SoundDeviceRecorder
-from .audio_transcriber import AudioTranscriber
-from .chat_message import ChatMessages
+from rpg_player.audio.sounddevice import SoundDeviceRecorder
+from rpg_player.domain.audio_recorder import AudioRecorder
+from rpg_player.domain.chat_message import ChatMessages
+from rpg_player.domain.transcriber import AudioTranscriber, TranscriptionResult
 
 
-@dataclass
-class TranscriptionChunk:
-    text: str
-    is_done: bool
-
-
-class NarrationScreen(Screen):
-    BINDINGS = [
-        ("ctrl+r", "toggle_record", "Record/Stop"),
-        ("ctrl+j", "accept", "Accept"),
-        ("escape", "cancel", "Cancel"),
-        ("ctrl+k", "clear", "Clear"),
+class NarrationScreen(Screen[None | str]):
+    BINDINGS: list[Binding] = [
+        Binding("ctrl+r", "toggle_record", "Record/Stop"),
+        Binding("ctrl+j", "accept", "Accept"),
+        Binding("escape", "cancel", "Cancel"),
+        Binding("ctrl+k", "clear", "Clear"),
     ]
 
-    CSS = """
+    CSS: ClassVar[str] = """
     #toolbar {
         padding: 0 1;
         height: auto;
@@ -61,20 +57,20 @@ class NarrationScreen(Screen):
         messages: ChatMessages,
     ) -> None:
         super().__init__()
-        self._title = title
-        self._is_recording = False
-        self._record_task = None
-        self._chunk_idx = 0
+        self._title: str = title
+        self._is_recording: bool = False
+        self._chunk_idx: int = 0
         self.transcriber: AudioTranscriber = transcriber
         self.recorder: AudioRecorder = SoundDeviceRecorder()
         self.messages: ChatMessages = messages
         # Path to temporary audio file for the current recording
-        self._current_audio_path: Optional[Path] = None
+        self._current_audio_path: Path | None = None
         # Task used while recording (starts recorder.start_recording)
-        self._record_task: Optional[asyncio.Task] = self._record_task
+        self._record_task: asyncio.Task[None] | None = None
         # Task used when running transcription (if any)
-        self._transcribe_task: Optional[asyncio.Task] = None
+        self._transcribe_task: asyncio.Task[None] | None = None
 
+    @override
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         with Vertical():
@@ -91,21 +87,21 @@ class NarrationScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.title = self._title
+        self.set_reactive(NarrationScreen.title, self._title)
 
         log: RichLog = self.query_one("#messages", RichLog)
         recent_msg_count = 10
-        log.write(f"{recent_msg_count} recent messages: ")
+        _ = log.write(f"{recent_msg_count} recent messages: ")
         last_n_messages = self.messages.messages[-recent_msg_count:]
         for message in last_n_messages:
             text = f"**{message.author}**: {message.content}"
             md = Markdown(text)
-            log.write(md)
+            _ = log.write(md)
 
         editor: TextArea = self.query_one(TextArea)
         # Don't set any initial text even if self._initial_text is set
         editor.text = ""
-        editor.focus()
+        _ = editor.focus()
 
     async def start_recording_and_transcribe(self) -> None:
         if self._record_task and not self._record_task.done():
@@ -134,15 +130,20 @@ class NarrationScreen(Screen):
         if self._current_audio_path is None:
             return
 
-        # Stop the device recorder
+        # Stop the device recorder.  The returned path is important: a recorder
+        # can fail in its worker thread (for example when the input device is
+        # unavailable) while still leaving the temporary WAV file behind.  Do
+        # not send that empty file to Whisper; silence/invalid audio commonly
+        # produces convincing but unrelated hallucinations.
         try:
-            await self.recorder.stop_recording()
+            stopped_path = await self.recorder.stop_recording()
         except Exception as e:
             self._set_status(f"Failed stopping recorder: {e}")
+            stopped_path = None
 
         # Ensure any recording waiter task is finished
         if self._record_task and not self._record_task.done():
-            self._record_task.cancel()
+            _ = self._record_task.cancel()
             try:
                 await self._record_task
             except asyncio.CancelledError:
@@ -151,10 +152,17 @@ class NarrationScreen(Screen):
         audio_path = self._current_audio_path
         self._current_audio_path = None
 
-        if not audio_path or not audio_path.exists():
+        if (
+            stopped_path is None
+            or not audio_path
+            or not audio_path.exists()
+            or not self._contains_audio(audio_path)
+        ):
             self._set_status(
-                "Recording finished, but no audio file available for transcription."
+                "No audio was recorded. Check the input device and microphone permissions."
             )
+            if audio_path and audio_path.exists():
+                audio_path.unlink(missing_ok=True)
             return
 
         # Prepare a handler to be called by streaming transcribers. The handler
@@ -162,38 +170,50 @@ class NarrationScreen(Screen):
         # main loop.
         loop = asyncio.get_running_loop()
 
-        def stream_handler(file: Path, text: str, done: bool) -> None:
+        def stream_handler(result: TranscriptionResult) -> None:
             try:
-                coro = self._append_transcription(TranscriptionChunk(text, done))
+                coro = self._append_transcription(result)
                 # Schedule coroutine safely on the main loop
-                loop.call_soon_threadsafe(lambda: asyncio.create_task(coro))
+                _ = loop.call_soon_threadsafe(lambda: asyncio.create_task(coro))
             except Exception:
                 # swallow handler exceptions to avoid breaking background thread
                 pass
 
-        # Run transcription in background so UI remains responsive
-        if self.transcriber.supports_async_out:
-            # transcribe_async_out is synchronous in our transcriber; run it in a thread
-            self._transcribe_task = asyncio.create_task(
-                asyncio.to_thread(
-                    self.transcriber.transcribe_async_out, audio_path, stream_handler
-                )
-            )
+        # Run transcription in background so UI remains responsive.  Keep the
+        # streaming call inside a coroutine so API errors are displayed rather
+        # than becoming an unobserved exception in the cleanup task.
+        transcribe_stream = cast(
+            Callable[[Path, Callable[[TranscriptionResult], None]], None] | None,
+            getattr(self.transcriber, "transcribe_stream", None),
+        )
+        if transcribe_stream is not None:
+
+            async def _run_streaming_transcription() -> None:
+                try:
+                    await asyncio.to_thread(
+                        transcribe_stream,
+                        audio_path,
+                        stream_handler,
+                    )
+                except Exception as e:
+                    self._set_status(f"Transcription failed: {e}")
+
+            self._transcribe_task = asyncio.create_task(_run_streaming_transcription())
         else:
 
-            async def _run_full_transcription():
+            async def _run_full_transcription() -> None:
                 try:
-                    text = await asyncio.to_thread(
+                    result = await asyncio.to_thread(
                         self.transcriber.transcribe, audio_path
                     )
-                    await self._append_transcription(TranscriptionChunk(text, True))
+                    await self._append_transcription(result)
                 except Exception as e:
                     self._set_status(f"Transcription failed: {e}")
 
             self._transcribe_task = asyncio.create_task(_run_full_transcription())
 
         # Cleanup temp file after transcription completes
-        async def _cleanup():
+        async def _cleanup() -> None:
             try:
                 if self._transcribe_task:
                     await self._transcribe_task
@@ -203,17 +223,31 @@ class NarrationScreen(Screen):
                 except Exception:
                     pass
 
-        asyncio.create_task(_cleanup())
+        _ = asyncio.create_task(_cleanup())
 
-    async def _append_transcription(self, chunk: TranscriptionChunk) -> None:
+    @staticmethod
+    def _contains_audio(path: Path) -> bool:
+        """Return whether a WAV contains a non-silent recorded frame.
+
+        A failed/default input device can still produce a perfectly valid WAV
+        header containing only zero samples. Sending that file to a speech
+        model is unsafe: transcription models may hallucinate text for silence.
+        """
+        try:
+            with wave.open(str(path), "rb") as audio:
+                if audio.getnframes() == 0:
+                    return False
+                # The recorder writes PCM16. Checking the raw bytes also avoids
+                # adding a NumPy dependency just to calculate a signal level.
+                return any(audio.readframes(audio.getnframes()))
+        except (OSError, wave.Error):
+            return False
+
+    async def _append_transcription(self, result: TranscriptionResult) -> None:
         editor = self.query_one(TextArea)
-        current = editor.text or ""
-        if chunk.is_done and current == "":
-            # replace all text with final output
-            editor.text = chunk.text
-        elif not chunk.is_done:
-            # append text
-            editor.text = f"{current}{chunk.text}"
+        # TranscriptionResult.text is the complete transcription so far, not
+        # merely the newly received delta.
+        editor.text = result.text
         editor.cursor_location = (
             editor.document.end
         )  # move caret to end; TextArea auto-scrolls when cursor/selection changes
@@ -229,7 +263,7 @@ class NarrationScreen(Screen):
         else:
             self._is_recording = False
             if self._record_task and not self._record_task.done():
-                self._record_task.cancel()
+                _ = self._record_task.cancel()
                 try:
                     await self._record_task
                 except asyncio.CancelledError:
@@ -246,10 +280,10 @@ class NarrationScreen(Screen):
 
     def action_accept(self) -> None:
         text = self.query_one(TextArea).text
-        self.dismiss(text)
+        _ = self.dismiss(text)
 
     def action_cancel(self) -> None:
-        self.dismiss(None)
+        _ = self.dismiss(None)
 
     @on(Button.Pressed)
     async def handle_button_pressed(self, event: Button.Pressed) -> None:
@@ -275,7 +309,7 @@ class NarrationScreen(Screen):
         editor = self.query_one(TextArea)
         editor.disabled = locked
         if not locked:
-            editor.focus()
+            _ = editor.focus()
 
     def _set_record_button_label(self, text: str) -> None:
         self.query_one("#btn-record", Button).label = text

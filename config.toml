@@ -10,7 +10,7 @@ prompt_path = "prompts/vex.md"
 type = "openai"
 
 [agents.args]
-model = "gpt-5-mini"
+model = "gpt-5.6-luna"
 
 [[agents]]
 name = "Garry"
@@ -18,7 +18,7 @@ prompt_path = "prompts/garry.md"
 type = "openai"
 
 [agents.args]
-model = "gpt-5-mini"
+model = "gpt-5.6-luna"
 
 [[agents]]
 name = "Bleb"
@@ -26,7 +26,7 @@ prompt_path = "prompts/bleb.md"
 type = "openai"
 
 [agents.args]
-model = "gpt-5-mini"
+model = "gpt-5.6-luna"
 
 [[voice_actors]]
 type = "piper"

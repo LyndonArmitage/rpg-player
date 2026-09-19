@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Iterable, override
+from collections.abc import Iterable
+from dataclasses import replace
+from typing import override
 
 from openai import OpenAI
 
-from .chat_message import ChatMessage
+from rpg_player.domain.chat_message import ChatMessage
 
 
 class ChatMessageTransformer(ABC):
@@ -58,7 +60,8 @@ class RemovePrefixMessageTransformer(ChatMessageTransformer):
     def transform(self, message: ChatMessage) -> ChatMessage:
         prefix: str = f"{message.author}:"
         if message.content.startswith(prefix):
-            message.content = (message.content[len(prefix) :]).strip()
+            new_content = (message.content[len(prefix) :]).strip()
+            return replace(message, content=new_content)
         return message
 
 
@@ -74,8 +77,7 @@ class AddElevenlabsAudioTagsTransformer(ChatMessageTransformer):
 
     # This prompt comes from the example at:
     # https://elevenlabs.io/docs/best-practices/prompting/eleven-v3
-    PROMPT: str = (  # noqa
-        """
+    PROMPT: str = """
 # Instructions
 
 ## 1. Role and Goal
@@ -181,8 +183,7 @@ Use these as a guide. You can infer similar, contextually appropriate **audio ta
 1. Add audio tags from the audio tags list. These must describe something auditory but only for the voice.
 2. Enhance emphasis without altering meaning or text.
 3. Reply ONLY with the enhanced text.
-""".strip()  # noqa
-    )
+""".strip()  # noqa  # noqa
 
     def __init__(self, openai: OpenAI, model: str = "gpt-5-nano") -> None:
         self.openai: OpenAI = openai
@@ -191,8 +192,7 @@ Use these as a guide. You can infer similar, contextually appropriate **audio ta
     @override
     def transform(self, message: ChatMessage) -> ChatMessage:
         new_content = self._get_response(message.content)
-        message.content = new_content
-        return message
+        return replace(message, content=new_content)
 
     def _get_response(self, text: str) -> str:
         response = self.openai.responses.create(
@@ -201,19 +201,6 @@ Use these as a guide. You can infer similar, contextually appropriate **audio ta
             model=self.model,
         )
 
-        # Depending on model the output can be slightly different
-        output = getattr(response, "output", None) or []
-        collected: list[str] = []
-        for item in output:
-            if getattr(item, "type", None) != "message":
-                continue
-            # item.content is a list of blocks
-            for block in getattr(item, "content", []) or []:
-                if getattr(block, "type", None) == "output_text":
-                    txt = getattr(block, "text", "") or ""
-                    if txt:
-                        collected.append(txt)
-        if collected:
-            return "\n".join(collected).strip()
-        # Fallback to output_text
-        return (getattr(response, "output_text", "") or "").strip()
+        # NOTE: We used to do a lot of OpenAI parsing here based on the types
+        # If that still needs to be done we will have to do it here again.
+        return response.output_text

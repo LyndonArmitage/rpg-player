@@ -1,34 +1,10 @@
-from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from typing import override
 
 import tiktoken
 
-from rpg_player.chat_message import ChatMessage, ChatMessages
-
-
-class TokenCounter(ABC):
-    """
-    Base class for counting tokens in messages
-    """
-
-    @abstractmethod
-    def count(self, msg: ChatMessage) -> int:
-        """
-        Count how many tokens are in a given message
-        """
-        raise NotImplementedError()
-
-    def count_all(self, msgs: ChatMessages) -> list[int]:
-        """
-        Count how many tokens are in all the messages
-        """
-        return [self.count(m) for m in msgs]
-
-    def count_total(self, msgs: ChatMessages) -> int:
-        """
-        Count how many tokens are in all the messages and return the total sum
-        """
-        return sum(self.count_all(msgs))
+from rpg_player.domain.chat_message import ChatMessage
+from rpg_player.domain.token_counter import TokenCounter
 
 
 class TiktokenTokenCounter(TokenCounter):
@@ -46,8 +22,12 @@ class TiktokenTokenCounter(TokenCounter):
         return len(self.encoding.encode(text))
 
     @override
-    def count_all(self, msgs: ChatMessages) -> list[int]:
+    def count_all(self, msgs: Iterable[ChatMessage]) -> list[int]:
         encoded: list[list[int]] = self.encoding.encode_batch(
             [f"{m.author}: {m.content}" for m in msgs]
         )
         return [len(e) for e in encoded]
+
+    @override
+    def count_sum(self, msgs: Iterable[ChatMessage]) -> int:
+        return sum(self.count_all(msgs))

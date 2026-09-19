@@ -1,82 +1,11 @@
 import logging
 import tempfile
-from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Iterable, List, Set, Union
 
-from .chat_message import ChatMessage
+from rpg_player.domain.chat_message import ChatMessage
+from rpg_player.domain.voice_actor import OutLoudVoiceActor, VoiceActor
 
 log = logging.getLogger(__name__)
-
-
-class VoiceActor(ABC):
-    """
-    A VoiceActor is a class that can speak messages.
-    """
-
-    @staticmethod
-    def parse_names(names: Union[str, Iterable[str]]) -> Set[str]:
-        """
-        Normalize names into a set of casefolded strings.
-
-        names can be a single string or some kind of Iterable
-        """
-        # Normalize names into a set of casefolded strings
-        if isinstance(names, str):
-            norm_names: Set[str] = {names.casefold()}
-        else:
-            # Ensure it's an iterable of strings
-            try:
-                norm_names = {n.casefold() for n in names}  # type: ignore[arg-type]
-            except TypeError:
-                raise TypeError("names must be a string or an iterable of strings")
-            if not all(isinstance(n, str) for n in names):  # type: ignore[iterable-issue]
-                raise TypeError("all elements of 'names' must be strings")
-        return norm_names
-
-    @abstractmethod
-    def speak_message(self, message: ChatMessage, folder_path: Path) -> Path:
-        """
-        Speak the given message, saving it to a file in the given path and
-        returning the path to the file
-        """
-
-        raise NotImplementedError
-
-    @abstractmethod
-    def should_speak_message(self, message: ChatMessage) -> bool:
-        """
-        Return true if this voice actor should speak the message
-        """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def speaker_names(self) -> Set[str]:
-        """
-        The speaker names this voice actor will work for
-        """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def can_speak_out_loud(self) -> bool:
-        """
-        True if this voice actor supports speaking out loud
-        """
-        return False
-
-    @abstractmethod
-    def speak_message_out_load(self, message: ChatMessage) -> None:
-        """
-        Speak the given message out loud. This will not save the message to a
-        file but instead speak the message through the audio output device as
-        soon as possible.
-
-        Not all voice actors will be able to do this so you should check if it
-        is possible first.
-        """
-        raise NotImplementedError
 
 
 class VoiceActorManager:
@@ -86,11 +15,11 @@ class VoiceActorManager:
     """
 
     def __init__(self):
-        self.actors: Set[VoiceActor] = set()
-        self._tmp: tempfile.TemporaryDirectory = tempfile.TemporaryDirectory(
+        self.actors: set[VoiceActor] = set()
+        self._tmp: tempfile.TemporaryDirectory[str] = tempfile.TemporaryDirectory(
             prefix="rpg-voices"
         )
-        self._tmp_path = Path(self._tmp.name)
+        self._tmp_path: Path = Path(self._tmp.name)
 
     def cleanup(self):
         """
@@ -116,7 +45,7 @@ class VoiceActorManager:
         if actor in self.actors:
             self.actors.remove(actor)
 
-    def process_message(self, message: ChatMessage) -> (bool, List[Path]):
+    def process_message(self, message: ChatMessage) -> tuple[bool, list[Path]]:
         """
         Given a message, process it, passing it to VoiceActor instances if
         needed.
@@ -132,15 +61,15 @@ class VoiceActorManager:
         will instead block this function while they speak.
         """
         log.debug(f"Processing message: {message.msg_id}")
-        paths: List[Path] = []
+        paths: list[Path] = []
         spoke: bool = False
         for actor in self.actors:
-            if actor.should_speak_message(message):
-                if actor.can_speak_out_loud:
-                    actor.speak_message_out_load(message)
+            if actor.should_speak(message):
+                if isinstance(actor, OutLoudVoiceActor):
+                    actor.speak_message_out_loud(message)
                     spoke = True
                 else:
-                    path = actor.speak_message(message, self._tmp_path)
+                    path = actor.synthesize(message, self._tmp_path)
                     if path:
                         paths.append(path)
                         spoke = True

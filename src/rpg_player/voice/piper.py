@@ -1,22 +1,30 @@
+import logging
 import queue
 import tempfile
 import threading
 import wave
-import logging
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Set, Union
+from typing import Protocol, override
 
-import onnxruntime as ort
-import sounddevice as sd
-from piper.voice import PiperVoice, SynthesisConfig
+import onnxruntime as ort  # pyright: ignore[reportMissingTypeStubs]
+import sounddevice as sd  # pyright: ignore[reportMissingTypeStubs]
+from piper.config import SynthesisConfig
+from piper.voice import AudioChunk, PiperVoice
 
-from .voice_actor import VoiceActor
-from .chat_message import ChatMessage, MessageType
+from rpg_player.domain.chat_message import ChatMessage, MessageType
+from rpg_player.domain.voice_actor import OutLoudVoiceActor, VoiceActor, parse_names
 
 log = logging.getLogger(__name__)
 
 
-class PiperVoiceActor(VoiceActor):
+class _RawOutputBuffer(Protocol):
+    def __getitem__(self, key: slice) -> bytes: ...
+
+    def __setitem__(self, key: slice, value: bytes | bytearray) -> None: ...
+
+
+class PiperVoiceActor(VoiceActor, OutLoudVoiceActor):
     """
     Voice Actor that uses the piper-tts library for voices.
 
@@ -28,34 +36,36 @@ class PiperVoiceActor(VoiceActor):
     """
 
     @classmethod
-    def with_all_speaker_ids(cls, model_path: Path) -> "PiperVoiceActor":
+    def with_all_speaker_ids(cls, model_path: Path | str) -> "PiperVoiceActor":
         """
         Create an instance with names corresponding to the voice integers
         """
         # Loads twice to get all speaker ids
         voice: PiperVoice = PiperVoice.load(str(model_path))
         speaker_count = voice.config.num_speakers
-        voice = None
         id_map = {str(i): i for i in range(speaker_count)}
+        if isinstance(model_path, str):
+            model_path = Path(model_path)
         output = cls(id_map.keys(), model_path)
         output.speaker_map = id_map
         return output
 
     def __init__(
         self,
-        names: Union[str, Iterable[str]],
+        names: str | Iterable[str],
         model_path: Path,
-        speaker_id: Optional[int] = None,
+        speaker_id: int | None = None,
     ):
-        self.names: Set[str] = VoiceActor.parse_names(names)
+        self.names: frozenset[str] = frozenset(parse_names(names))
         self.supports_cuda: bool = (
-            "CUDAExecutionProvider" in ort.get_available_providers()
+            "CUDAExecutionProvider"
+            in ort.get_available_providers()  # pyright: ignore[reportUnknownMemberType]
         )
         self.voice: PiperVoice = PiperVoice.load(
             str(model_path), use_cuda=self.supports_cuda
         )
-        self.syn_config = SynthesisConfig(speaker_id=speaker_id)
-        self.speaker_map: Dict[str, int] = {}
+        self.syn_config: SynthesisConfig = SynthesisConfig(speaker_id=speaker_id)
+        self.speaker_map: dict[str, int] = {}
         self.number_of_speakers: int = self.voice.config.num_speakers
 
     def set_speaker_id_for(self, name: str, speaker_id: int):
@@ -77,25 +87,27 @@ class PiperVoiceActor(VoiceActor):
             )
 
     @property
-    def speaker_names(self) -> Set[str]:
+    @override
+    def speaker_names(self) -> frozenset[str]:
         return self.names
 
-    def should_speak_message(self, message: ChatMessage) -> bool:
-        return (message.author.casefold() in self.names) and (
-            message.type == MessageType.SPEECH
-        )
+    @override
+    def should_speak(self, msg: ChatMessage) -> bool:
+        author_matches = msg.author.casefold() in self.names
+        return author_matches and msg.message_type == MessageType.SPEECH
 
-    def speak_message(self, message: ChatMessage, folder_path: Path) -> Path:
-        log.debug(f"Speaking message {message.msg_id} with Piper")
-        folder_path.mkdir(parents=True, exist_ok=True)
+    @override
+    def synthesize(self, msg: ChatMessage, output_dir: Path) -> Path:
+        log.debug(f"Speaking message {msg.msg_id} with Piper")
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         out_path = None
         with tempfile.NamedTemporaryFile(
-            dir=folder_path, suffix=".wav", delete=False
+            dir=output_dir, suffix=".wav", delete=False
         ) as f:
             out_path = Path(f.name)
 
-        text = (message.content or "").strip()
+        text = msg.content.strip()
 
         with wave.open(str(out_path), "wb") as wf:
             wf.setnchannels(1)  # Piper outputs mono
@@ -103,7 +115,7 @@ class PiperVoiceActor(VoiceActor):
             wf.setframerate(self.voice.config.sample_rate)
 
             if text:
-                config = self._get_config_for_author(message.author)
+                config = self._get_config_for_author(msg.author)
                 for chunk in self.voice.synthesize(text, syn_config=config):
                     wf.writeframes(chunk.audio_int16_bytes)
         return out_path
@@ -115,24 +127,21 @@ class PiperVoiceActor(VoiceActor):
             config = SynthesisConfig(speaker_id=self.speaker_map[author_casefold])
         return config
 
-    @property
-    def can_speak_out_loud(self) -> bool:
-        return True
-
-    def speak_message_out_load(self, message: ChatMessage) -> None:
-        text = (message.content or "").strip()
+    @override
+    def speak_message_out_loud(self, msg: ChatMessage) -> None:
+        text = (msg.content or "").strip()
         if not text:
             return
-        config = self._get_config_for_author(message.author)
-        gen = self.voice.synthesize(text, syn_config=config)
-        first_chunk = next(gen)
+        config = self._get_config_for_author(msg.author)
+        gen: Iterator[AudioChunk] = iter(self.voice.synthesize(text, syn_config=config))
+        first_chunk: AudioChunk = next(gen)
         assert first_chunk.sample_width == 2, "Expected 16-bit PCM"
         sample_rate = first_chunk.sample_rate
         channels = first_chunk.sample_channels or 1
         bytes_per_frame = channels * first_chunk.sample_width
 
         # Use a queue to fill with audio bytes
-        fifo = queue.Queue(maxsize=32)
+        fifo: queue.Queue[bytes | None] = queue.Queue(maxsize=32)
         playback_done = threading.Event()
 
         def producer():
@@ -176,7 +185,12 @@ class PiperVoiceActor(VoiceActor):
         eos_seen = False
 
         # This call back will fill our device buffer from the byte buffer
-        def callback(outdata, frames, time, status):
+        def callback(
+            outdata: _RawOutputBuffer,
+            frames: int,
+            _time: object,
+            _status: object,
+        ) -> None:
             nonlocal buffer, eos_seen, tail_bytes_remaining
             needed = frames * bytes_per_frame
             while len(buffer) < needed and not eos_seen:
@@ -234,4 +248,4 @@ class PiperVoiceActor(VoiceActor):
             finished_callback=finished_callback,
         ):
             prod_thread.join()
-            playback_done.wait()
+            _ = playback_done.wait()

@@ -1,5 +1,10 @@
 # RPG Player
 
+> [!IMPORTANT]
+> This project currently undergoing a rewrite.
+> I was not satisfied with the state of the Python code within so a lot of it
+> is being ripped apart and rebuilt
+
 A local multi-agent AI RPG tool inspired by DougDoug's AI RPG videos and the
 [Multi-Agent-GPT-Characters](https://github.com/DougDougGithub/Multi-Agent-GPT-Characters)
 repo.
@@ -85,7 +90,7 @@ from the JSON or TOML configuration file. Below is a simple example
       "prompt_path": "prompts/vex.md",
       "type": "openai",
       "args": {
-        "model": "gpt-5-mini"
+        "model": "gpt-5.6-luna"
       }
     },
     {
@@ -93,7 +98,7 @@ from the JSON or TOML configuration file. Below is a simple example
       "prompt_path": "prompts/garry.md",
       "type": "openai",
       "args": {
-        "model": "gpt-5-mini"
+        "model": "gpt-5.6-luna"
       }
     },
     {
@@ -101,7 +106,7 @@ from the JSON or TOML configuration file. Below is a simple example
       "prompt_path": "prompts/bleb.md",
       "type": "openai",
       "args": {
-        "model": "gpt-5-mini"
+        "model": "gpt-5.6-luna"
       }
     }
   ],

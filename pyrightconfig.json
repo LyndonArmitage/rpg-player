@@ -10,6 +10,13 @@
     "tests"
   ],
   "exclude": [
-    "**/__pycache__"
-  ]
+    "**/__pycache__",
+    ".venv"
+  ],
+  "strict": [
+    "src/rpg_player/domain",
+    "src/rpg_player/agents",
+    "src/rpg_player/voice"
+  ],
+  "executionEnvironments": []
 }

@@ -1,57 +1,24 @@
 import time
-from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from pathlib import Path
 from random import Random
-from typing import Callable, Iterable, List, Optional, Union, override
+from typing import Callable, Final, override
 
-from openai import OpenAI
+from openai import Omit, OpenAI, omit
+from openai.types.audio import (
+    TranscriptionTextDeltaEvent,
+    TranscriptionTextDoneEvent,
+    TranscriptionTextSegmentEvent,
+)
 
-
-class AudioTranscriber(ABC):
-    """
-    Base Audio Transcriber class.
-
-    This should take a file (normally WAV file) and return the transcription
-    from
-
-    The transcription should just be what was spoken with no timestamps.
-
-    AudioTranscriber's can optionally support streaming output as soon as it is
-    available.
-    """
-
-    @abstractmethod
-    def transcribe(self, file: Path) -> str:
-        """
-        Transcribe an audio file, returning the output at the end.
-
-        This method is blocking.
-        """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def supports_async_out(self) -> bool:
-        """
-        Whether this supports async output or not
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def transcribe_async_out(
-        self, file: Path, handler: Callable[[Path, str, bool], None]
-    ):
-        """
-        Transcribe an audio file, returning the output via a handler.
-
-        The handler can be called multiple times and should take in the path of
-        the file, the transcribed text, and a flag to say if transcription was
-        completed or not.
-        """
-        raise NotImplementedError
+from rpg_player.domain.transcriber import (
+    AudioTranscriber,
+    StreamOutputAudioTranscriber,
+    TranscriptionResult,
+)
 
 
-class OpenAIAudioTranscriber(AudioTranscriber):
+class OpenAIAudioTranscriber(AudioTranscriber, StreamOutputAudioTranscriber):
     """
     OpenAI Based Audio Transcriber.
 
@@ -61,86 +28,45 @@ class OpenAIAudioTranscriber(AudioTranscriber):
         - whisper-1
         - gpt-4o-transcribe
         - gpt-4o-mini-transcribe
-
-    `whisper-1` is the quickest model by far but it does not support async
-    output or prompting.
-
-    `gpt-4o-transcribe` is the best model, and matches `whisper-1` in terms of
-    price, but may take longer to transcribe.
-
-    `gpt-4o-mini-transcribe` is the cheapeast model. It's not the most accurate
-     and is likely the slowest, but it will cost half the cost of the others.
-
-     It's recommended that you choose either `whisper-1` or `gpt-4o-transcribe`.
+        - gpt-live-transcribe
+        - gpt-transcribe
     """
 
     def __init__(
         self,
         openai: OpenAI,
-        model: str = "gpt-4o-transcribe",
-        language: str = "en",
-        extra_kwargs: Optional[dict] = None,
+        model: str = "gpt-transcribe",
+        language: str | None = "en",
+        extra_prompt: str | None = None,
     ):
-        """
-        :param openai: OpenAI SDK client
-        :param model: Name of model to use (default: "gpt-4o-transcribe")
-        :param language: Language name, should be 2 character code (default: "en")
-        :param extra_kwargs: Extra keyword arguments for transcription API call
-        """
-        self.openai = openai
-        self.model = model
-
-        self.language = language
-        reserved_keys = {"model", "file", "language", "stream"}
-        extra_kwargs = extra_kwargs or {}
-        intersection = reserved_keys & extra_kwargs.keys()
-        if intersection:
-            raise ValueError(
-                (
-                    "extra_kwargs contains reserved keyword(s) "
-                    f"that will be overwritten: {sorted(intersection)}"
-                )
-            )
-        # All parameters that will be passed to API
-        self.transcription_kwargs = {"model": model, "language": language}
-
-        if "prompt" not in extra_kwargs:
-            # Setup a prompt based on the model used
-            match model:
-                case "gpt-4o-transcribe" | "gpt-4o-mini-transcribe":
-                    prompt = (
-                        "The following is narration from a Dungeon/Game Master "
-                        "for a traditional tabletop role playing game."
-                    )
-                    self.transcription_kwargs["prompt"] = prompt
-                # TODO: Add branches for other model prompts
-        self.transcription_kwargs.update(extra_kwargs)
+        self.openai: OpenAI = openai
+        self.model: Final[str] = model
+        self.language: Final[str | Omit] = language if language else omit
+        self.prompt: Final[str | Omit] = extra_prompt if extra_prompt else omit
 
     @override
-    def transcribe(self, file: Path) -> str:
+    def transcribe(self, file: Path) -> TranscriptionResult:
         """Transcribe an audio file using the OpenAI Whisper API."""
         if not file.exists():
             raise FileNotFoundError(f"Audio file does not exist: {file}")
         try:
             with file.open("rb") as audio_fp:
                 response = self.openai.audio.transcriptions.create(
+                    model=self.model,
                     file=audio_fp,
-                    **self.transcription_kwargs,
+                    language=self.language,
+                    prompt=self.prompt,
                 )
-            return response.text
+            return TranscriptionResult(
+                path=file, text=response.text, delta=response.text, completed=True
+            )
         except Exception as e:
-            raise RuntimeError(f"Transcription failed: {e}")
-
-    @property
-    @override
-    def supports_async_out(self) -> bool:
-        """Whether async transcription is supported (streaming via OpenAI API)."""
-        return self.model != "whisper-1"
+            raise RuntimeError("Transcription failed") from e
 
     @override
-    def transcribe_async_out(
-        self, file: Path, handler: Callable[[Path, str, bool], None]
-    ):
+    def transcribe_stream(
+        self, file: Path, handler: Callable[[TranscriptionResult], None]
+    ) -> None:
         """
         Streams transcription chunks from the OpenAI API and calls the handler
         for each chunk.
@@ -151,28 +77,51 @@ class OpenAIAudioTranscriber(AudioTranscriber):
             raise FileNotFoundError(f"Audio file does not exist: {file}")
         try:
             with file.open("rb") as audio_fp:
-                stream_kwargs = dict(self.transcription_kwargs)
-                stream_kwargs["stream"] = True
                 stream = self.openai.audio.transcriptions.create(
+                    model=self.model,
                     file=audio_fp,
-                    **stream_kwargs,
+                    language=self.language,
+                    prompt=self.prompt,
+                    keywords=[],
+                    stream=True,
                 )
-                full_text = ""
+                gathered_text: str = ""
                 for event in stream:
-                    delta = getattr(event, "delta", None)
-                    # event type could be 'transcript.text.delta' or
-                    # 'transcript.text.done', etc.
-                    # Only handle 'delta' events incrementally
-                    if delta:
-                        full_text += delta
-                        handler(file, delta, False)
-                # At the end, report everything with done=True
-                handler(file, full_text, True)
+                    if isinstance(event, TranscriptionTextSegmentEvent):
+                        segment_event: TranscriptionTextSegmentEvent = event
+                        gathered_text += segment_event.text
+                        result = TranscriptionResult(
+                            path=file,
+                            text=gathered_text,
+                            delta=segment_event.text,
+                            completed=False,
+                        )
+                        handler(result)
+                    elif isinstance(event, TranscriptionTextDoneEvent):
+                        done_event: TranscriptionTextDoneEvent = event
+                        result = TranscriptionResult(
+                            path=file,
+                            text=done_event.text,
+                            delta="",
+                            completed=True,
+                        )
+                        handler(result)
+                    else:
+                        delta_event: TranscriptionTextDeltaEvent = event
+                        delta = delta_event.delta
+                        gathered_text += delta
+                        result = TranscriptionResult(
+                            path=file,
+                            text=gathered_text,
+                            delta=delta,
+                            completed=False,
+                        )
+                        handler(result)
         except Exception as e:
-            raise RuntimeError(f"Streaming transcription failed: {e}")
+            raise RuntimeError("Streaming transcription failed") from e
 
 
-class DummyAudioTranscriber(AudioTranscriber):
+class DummyAudioTranscriber(AudioTranscriber, StreamOutputAudioTranscriber):
     """
     A Dummy implementation of AudioTranscriber.
 
@@ -182,15 +131,10 @@ class DummyAudioTranscriber(AudioTranscriber):
     instance is used to pick from these.
     """
 
-    def __init__(
-        self, dummy_text: Union[str, Iterable[str]], random: Optional[Random] = None
-    ):
-        if random:
-            self.random: Random = random
-        else:
-            self.random: Random = Random()
+    def __init__(self, dummy_text: str | Iterable[str], random: Random | None = None):
+        self.random: Random = random if random else Random()
         if isinstance(dummy_text, str):
-            self.dummy_text: List[str] = [dummy_text]
+            self.dummy_text: list[str] = [dummy_text]
         else:
             self.dummy_text = [str(t) for t in dummy_text]
         self._dummy_len: int = len(self.dummy_text)
@@ -205,22 +149,26 @@ class DummyAudioTranscriber(AudioTranscriber):
             return self.dummy_text[n]
 
     @override
-    def transcribe(self, file: Path) -> str:
-        return self._random_text()
-
-    @property
-    @override
-    def supports_async_out(self) -> bool:
-        return True
+    def transcribe(self, file: Path) -> TranscriptionResult:
+        text = self._random_text()
+        return TranscriptionResult(path=file, text=text, delta="", completed=True)
 
     @override
-    def transcribe_async_out(
-        self, file: Path, handler: Callable[[Path, str, bool], None]
-    ):
+    def transcribe_stream(
+        self, file: Path, handler: Callable[[TranscriptionResult], None]
+    ) -> None:
         line_count = self.random.randint(1, 3)
         seperator = "\n"
+        full_text: str = ""
         for _ in range(line_count):
             time.sleep(0.2)
             text = self._random_text() + seperator
-            handler(file, text, False)
-        handler(file, "", True)
+            full_text += text
+            result = TranscriptionResult(
+                path=file, text=full_text, delta=text, completed=False
+            )
+            handler(result)
+        final_result = TranscriptionResult(
+            path=file, text=full_text, delta="", completed=True
+        )
+        handler(final_result)

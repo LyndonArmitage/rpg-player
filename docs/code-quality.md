@@ -69,9 +69,6 @@ comments like:
 Or you can edit the `pyrightconfig.json` file and add libraries to the
 `allowedUntypedLibraries` array.
 
-`boto3` stubs should not be managed via `basedpyright`. For more information on
-`boto3` and its type stubs see `README.md`.
-
 ### black
 
 [black](https://black.readthedocs.io/en/stable/) is a code formatter for
