@@ -7,6 +7,8 @@ Project.
 
 ### Added
 
+- Add missing `pytest-cov` dev dependency
+
 ### Changed
 
 ### Removed
