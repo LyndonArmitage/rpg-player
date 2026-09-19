@@ -33,11 +33,13 @@ Project.
 - Fixed some minor bugs in configuration
 - Made configuration use typed dictionaries in some places
 - Replaced `pre-commit` with `prek`
-- Tidied up README.md
+- Tidied up `README.md`
+- Updated libraries in `uv.lock`
 
 ### Removed
 
 - Removed extra keyword arguments parsing from Agents
+- Remove `flake8`, we can rely on `ruff`, `black` and `basedpyright`
 
 ## Version 0.1.0
 
