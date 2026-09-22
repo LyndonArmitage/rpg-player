@@ -210,3 +210,6 @@ piper-models/
 config.json
 *.cast
 config.toml
+
+# Example games
+games/*
