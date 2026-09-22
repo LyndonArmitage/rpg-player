@@ -45,14 +45,14 @@ language_version = "python3.13"
 
 [[repos]]
 repo = "https://github.com/astral-sh/ruff-pre-commit"
-rev = "v0.16.6"
+rev = "v0.16.8"
 
 [[repos.hooks]]
 id = "ruff-check"
 
 [[repos]]
 repo = "https://github.com/DetachHead/basedpyright-prek-mirror"
-rev = "1.40.0"
+rev = "1.40.1"
 
 [[repos.hooks]]
 id = "basedpyright"
