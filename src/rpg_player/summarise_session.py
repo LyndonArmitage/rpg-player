@@ -110,7 +110,7 @@ def main():
     _ = parser.add_argument(
         "--model",
         help="The OpenAI model to use.",
-        default="gpt-5",
+        default="gpt-5.6-luna",
         type=str,
     )
 
