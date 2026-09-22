@@ -3,6 +3,7 @@ import asyncio
 import logging
 import os
 import threading
+from collections.abc import Iterable
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from random import Random
@@ -10,16 +11,14 @@ from typing import Callable, ClassVar, TypedDict, cast, override
 
 from dotenv import load_dotenv
 from openai import OpenAI
-from rich.markdown import Markdown
 from textual import getters, on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, VerticalGroup
-from textual.events import Resize
+from textual.containers import Horizontal, VerticalGroup, VerticalScroll
 from textual.logging import TextualHandler
 from textual.screen import Screen
 from textual.types import CSSPathType
-from textual.widgets import Button, Footer, Header, Label, RichLog, Rule, Switch
+from textual.widgets import Button, Footer, Header, Label, Markdown, Rule, Switch
 
 from rpg_player.agents.openai import OpenAIAgent
 from rpg_player.domain.agent import Agent
@@ -181,13 +180,13 @@ class Standby(Screen[None]):
         self.agent_names: list[str] = state_machine.agent_names
         self.random: Random = Random()
         self._disable_bindings: threading.Event = threading.Event()
-        self.rendered_messages: list[object] = []
+        self.rendered_messages: list[Markdown] = []
         self.transcriber: AudioTranscriber = transcriber
 
     @override
     def compose(self) -> ComposeResult:
         yield Header()
-        yield RichLog(id="messages", wrap=True)
+        yield VerticalScroll(id="messages")
         yield Rule(line_style="thick")
         yield Label("Nothing has happened yet...", id="status")
         with Horizontal(id="buttons"):
@@ -205,15 +204,17 @@ class Standby(Screen[None]):
                 yield Switch(id="speak-switch", tooltip="Toggle Speaking", value=True)
         yield Footer()
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         # Make sure any pre-made messages are visible
+        msgs: list[str] = []
         for msg in self.state_machine.messages:
             text = f"**{msg.author}:** {msg.content}"
-            self.add_message(text)
+            msgs.append(text)
+        await self.add_messages(msgs)
 
     @on(Button.Pressed, "#buttons #narrate")
-    def handle_narrate(self, _: Button.Pressed):
-        self.action_enter_narrate()
+    async def handle_narrate(self, _: Button.Pressed):
+        await self.action_enter_narrate()
 
     @on(Button.Pressed, "#buttons .agent")
     def handle_agent(self, event: Button.Pressed):
@@ -231,15 +232,6 @@ class Standby(Screen[None]):
     def handle_not_last(self, _: Button.Pressed) -> None:
         self.action_random_not_last_respond()
 
-    @on(Resize)
-    def _reflow_log(self, _ignore: Resize) -> None:
-        # TODO: This might be a bit heavy with hundreds of messages
-        if self.rendered_messages:
-            log: RichLog = self.query_one("#messages", RichLog)
-            _ = log.clear()
-            for msg in self.rendered_messages:
-                _ = log.write(msg, shrink=False)
-
     def action_agent_1_respond(self):
         if self._disable_bindings.is_set():
             return
@@ -255,17 +247,17 @@ class Standby(Screen[None]):
             return
         self.action_agent_respond(2)
 
-    def action_enter_narrate(self) -> None:
+    async def action_enter_narrate(self) -> None:
         if self._disable_bindings.is_set():
             return
 
-        def on_narrate_done(result: str | None):
+        async def on_narrate_done(result: str | None):
             if result:
                 result = result.strip()
                 message = ChatMessage.narration("DM", result)
                 self.state_machine.add_message(message)
                 msg = f"**DM:** {result}"
-                self.add_message(msg)
+                await self.add_message(msg)
                 self._update_label("DM narrated.")
 
         narrate_screen = NarrationScreen(
@@ -293,7 +285,7 @@ class Standby(Screen[None]):
             return
 
         text = f"**{msg.author}:** {msg.content}"
-        self.add_message(text)
+        await self.add_message(text)
 
         speak_switch: Switch = cast(Switch, self.query_one("#speak-switch"))
         should_speak: bool = speak_switch.value
@@ -330,11 +322,18 @@ class Standby(Screen[None]):
             index = self.random.randint(0, len(self.agent_names) - 1)
         self.action_agent_respond(index)
 
-    def add_message(self, text: str) -> None:
-        log: RichLog = self.query_one("#messages", RichLog)
-        md = Markdown(text)
-        _ = log.write(md, shrink=False)
-        self.rendered_messages.append(md)
+    async def add_message(self, text: str) -> None:
+        await self.add_messages([text])
+
+    async def add_messages(self, msgs: Iterable[str]) -> None:
+        log: VerticalScroll = self.query_one("#messages", VerticalScroll)
+        mds: list[Markdown] = []
+        for msg in msgs:
+            md = Markdown(msg)
+            mds.append(md)
+        await log.mount_all(mds)
+        self.rendered_messages.extend(mds)
+        log.scroll_end(animate=False)
 
     def _update_label(self, text: str) -> None:
         label = cast(Label, self.query_one("#status"))

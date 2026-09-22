@@ -5,6 +5,7 @@ Button {
 #messages {
     height: 1fr;     /* take all remaining vertical space */
     padding: 1;
+    max-width: 120; /* Not too wide */
 }
 
 #buttons {

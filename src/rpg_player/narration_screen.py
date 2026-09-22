@@ -6,13 +6,12 @@ import wave
 from pathlib import Path
 from typing import Callable, ClassVar, cast, override
 
-from rich.markdown import Markdown
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Label, RichLog, TextArea
+from textual.widgets import Button, Footer, Header, Label, Markdown, TextArea
 
 from rpg_player.audio.sounddevice import SoundDeviceRecorder
 from rpg_player.domain.audio_recorder import AudioRecorder
@@ -39,9 +38,6 @@ class NarrationScreen(Screen[None | str]):
     #status {
         color: $text 50%;
         padding: 0 1;
-    }
-    RichLog {
-        height: 0.5fr;
     }
     TextArea {
         height: 1fr;
@@ -79,24 +75,28 @@ class NarrationScreen(Screen[None | str]):
                 yield Button("Accept", id="btn-accept", variant="success")
                 yield Button("Cancel", id="btn-cancel", variant="warning")
                 yield Button("Clear", id="btn-clear", classes="end")
-            yield RichLog(id="messages")
+            yield VerticalScroll(id="messages")
             yield Label("Ready.", id="status")
             yield TextArea(
                 id="editor", language="markdown", tooltip="Narration text (editable)"
             )
         yield Footer()
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         self.set_reactive(NarrationScreen.title, self._title)
 
-        log: RichLog = self.query_one("#messages", RichLog)
-        recent_msg_count = 10
-        _ = log.write(f"{recent_msg_count} recent messages: ")
+        log: VerticalScroll = self.query_one("#messages", VerticalScroll)
+        recent_msg_count = 25
         last_n_messages = self.messages.messages[-recent_msg_count:]
+
+        await log.mount(Label(f"{len(last_n_messages)} most recent messages: "))
+        mds: list[Markdown] = []
         for message in last_n_messages:
             text = f"**{message.author}**: {message.content}"
             md = Markdown(text)
-            _ = log.write(md)
+            mds.append(md)
+        await log.mount_all(mds)
+        log.scroll_end(animate=False)
 
         editor: TextArea = self.query_one(TextArea)
         # Don't set any initial text even if self._initial_text is set
