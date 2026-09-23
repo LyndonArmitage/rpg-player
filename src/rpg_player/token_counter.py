@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Iterable
 from typing import override
 
@@ -13,8 +14,15 @@ class TiktokenTokenCounter(TokenCounter):
     """
 
     def __init__(self, model: str):
-        self.encoding: tiktoken.Encoding = tiktoken.encoding_for_model(model)
-        self.encoding_name: str = tiktoken.encoding_name_for_model(model)
+        encoding: tiktoken.Encoding | None = None
+        try:
+            encoding = tiktoken.encoding_for_model(model)
+        except Exception:
+            logging.getLogger(__name__).warning(
+                f"Could not get encoder for {model} falling back"
+            )
+            encoding = tiktoken.get_encoding("o200k_base")
+        self.encoding: tiktoken.Encoding = encoding
 
     @override
     def count(self, msg: ChatMessage) -> int:
