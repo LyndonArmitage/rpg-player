@@ -33,6 +33,8 @@ from .narration_screen import NarrationScreen
 from .state_machine import StateMachine
 from .voice_actor import VoiceActorManager
 
+log = logging.getLogger(__name__)
+
 
 class ActorButtonData(TypedDict):
     index: int
@@ -161,6 +163,10 @@ def setup_logging(level: int = logging.INFO, logfile: str | None = None) -> None
 
 
 class Standby(Screen[None]):
+    # Voice actors which stream directly to an output device can block while
+    # waiting for a network response or for the audio device.  Do not let one
+    # of those calls leave the UI disabled forever.
+    SPEECH_TIMEOUT_SECONDS: ClassVar[float] = 120.0
     TITLE: ClassVar[str | None] = "RPG Party"
     SUB_TITLE: ClassVar[str | None] = "Standby"
     CSS_PATH: ClassVar[CSSPathType | None] = "standby.tcss"
@@ -277,27 +283,76 @@ class Standby(Screen[None]):
         self._update_label(f"{name} is thinking...")
         self.app.notify(f"{name} is thinking")
         try:
+            log.info("Requesting response from agent %s (index=%d)", name, number)
             msg = await asyncio.to_thread(self.state_machine.agent_respond, number)
+            log.info(
+                "Received response from agent %s (message_id=%s, characters=%d)",
+                name,
+                msg.msg_id,
+                len(msg.content),
+            )
+
+            text = f"**{msg.author}:** {msg.content}"
+            await self.add_message(text)
+
+            speak_switch: Switch = cast(Switch, self.query_one("#speak-switch"))
+            should_speak: bool = speak_switch.value
+
+            if should_speak:
+                self._update_label(f"{name} is speaking...")
+                self.app.notify(f"{name} is speaking...")
+
+                # In particular, streaming voice actors perform network and
+                # audio I/O synchronously.  A stalled stream must not leave
+                # all of the response controls disabled indefinitely.
+                def play_message_with_logging() -> None:
+                    log.info("Starting speech for %s (message_id=%s)", name, msg.msg_id)
+                    try:
+                        self.state_machine.play_message(msg)
+                    except Exception:
+                        log.exception(
+                            "Speech failed for %s (message_id=%s)", name, msg.msg_id
+                        )
+                        raise
+                    else:
+                        log.info(
+                            "Speech call completed for %s (message_id=%s)",
+                            name,
+                            msg.msg_id,
+                        )
+
+                try:
+                    await asyncio.wait_for(
+                        asyncio.to_thread(play_message_with_logging),
+                        timeout=self.SPEECH_TIMEOUT_SECONDS,
+                    )
+                except TimeoutError as error:
+                    # The thread used by to_thread cannot be forcibly killed.
+                    # The wrapper above will still log if it eventually
+                    # returns or raises, which helps identify a stalled actor.
+                    log.warning(
+                        (
+                            "Speech timed out for %s (message_id=%s) after %.1f seconds; "
+                            "the speech worker may still be running"
+                        ),
+                        name,
+                        msg.msg_id,
+                        self.SPEECH_TIMEOUT_SECONDS,
+                    )
+                    raise TimeoutError(
+                        f"speech timed out after {self.SPEECH_TIMEOUT_SECONDS:g} seconds"
+                    ) from error
+
+            self._update_label(f"{name} responded.")
         except Exception as e:
+            log.exception("Agent response flow failed for %s", name)
             self._update_label(f"{name} failed to respond: {e}")
-            self._enable_responses()
             self.app.notify(f"{name} failed to respond", severity="error")
-            return
-
-        text = f"**{msg.author}:** {msg.content}"
-        await self.add_message(text)
-
-        speak_switch: Switch = cast(Switch, self.query_one("#speak-switch"))
-        should_speak: bool = speak_switch.value
-
-        if should_speak:
-            self._update_label(f"{name} is speaking...")
-            self.app.notify(f"{name} is speaking...")
-
-            await asyncio.to_thread(self.state_machine.play_message, msg)
-
-        self._update_label(f"{name} responded.")
-        self._enable_responses()
+        finally:
+            # This must also run when speech generation/playback raises.  The
+            # old code only handled errors from the agent response, so a voice
+            # actor exception could permanently disable the UI.
+            self._enable_responses()
 
     def action_random_respond(self) -> None:
         if self._disable_bindings.is_set():
