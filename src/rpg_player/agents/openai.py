@@ -28,7 +28,7 @@ class OpenAIAgent(Agent):
         openai: OpenAI,
         name: str,
         system_prompt: str,
-        model: str = "gpt-5.6-luna",
+        model: str = "gpt-6-luna",
         max_output_tokens: int = 3000,
         reasoning_effort: Reasoning | None = None,
         system_role: Literal["developer", "system"] = "developer",

@@ -41,7 +41,7 @@ def test_name_and_system_message_are_configured():
 
     assert agent.name == "Gandalf"
     assert agent.system_prompt == "You are a wise wizard."
-    assert agent.model == "gpt-5.6-luna"
+    assert agent.model == "gpt-6-luna"
     assert agent.max_tokens == 3000
     assert agent.system_message == {
         "role": "developer",
@@ -103,7 +103,7 @@ def test_respond_converts_messages_and_returns_speech():
                 {"role": "user", "content": "DM: The party is in danger."},
             ],
             {
-                "model": "gpt-5.6-luna",
+                "model": "gpt-6-luna",
                 "max_output_tokens": 3000,
                 "reasoning": {"effort": "low"},
             },

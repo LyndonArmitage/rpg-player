@@ -110,7 +110,7 @@ class AgentConfig:
         prompt_config: PromptConfig,
         **_kwargs: Unpack[AgentArgs],
     ) -> OpenAIAgent:
-        model: str = self.args.get("model", "gpt-5.6-luna")
+        model: str = self.args.get("model", "gpt-6-luna")
         max_output_tokens: int = self.args.get("max_output_tokens", 3000)
         system_role: Literal["system", "developer"] = self.args.get(
             "system_role", "developer"
