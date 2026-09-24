@@ -1,14 +1,12 @@
-import asyncio
 import logging
 import os
 import tempfile
-import threading
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Final, override
 
-from openai import AsyncOpenAI, OpenAI
-from openai.helpers import LocalAudioPlayer
+import sounddevice as sd  # pyright: ignore[reportMissingTypeStubs]
+from openai import OpenAI
 
 from rpg_player.domain.chat_message import ChatMessage, MessageType
 from rpg_player.domain.voice_actor import OutLoudVoiceActor, VoiceActor, parse_names
@@ -60,10 +58,6 @@ class OpenAIVoiceActor(VoiceActor, OutLoudVoiceActor):
             raise ValueError(
                 f"Unsupported response_format: {response_format!r}"
             ) from err
-
-        # Create an Async client using the OpenAI client
-        self._api_key: str | None = getattr(openai, "api_key", None)
-        self._base_url: str | None = getattr(openai, "base_url", None)
 
     @property
     @override
@@ -121,31 +115,19 @@ class OpenAIVoiceActor(VoiceActor, OutLoudVoiceActor):
         # Override the format to be low-latency
         kw["response_format"] = "pcm"
 
-        async def _play_async():
-            async_openai: AsyncOpenAI = AsyncOpenAI(
-                api_key=self._api_key, base_url=self._base_url
-            )
-            try:
-                async with async_openai.audio.speech.with_streaming_response.create(
-                    **kw  # pyright: ignore[reportArgumentType]
-                    # TODO: Fix above ignore
-                ) as resp:
-                    await LocalAudioPlayer().play(resp)
-            finally:
-                await async_openai.close()
-
-        try:
-            _ = asyncio.get_running_loop()
-
-            def runner():
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    loop.run_until_complete(_play_async())
-                finally:
-                    loop.close()
-
-            threading.Thread(target=runner, daemon=True).start()
-        except RuntimeError:
-            # Not running in loop, so run it directly and block until done
-            asyncio.run(_play_async())
+        with self.openai.audio.speech.with_streaming_response.create(
+            **kw  # pyright: ignore[reportArgumentType]
+            # TODO: Fix above ignore
+        ) as response:
+            with sd.RawOutputStream(
+                samplerate=24000,
+                channels=1,
+                dtype="int16",
+                blocksize=512,
+                latency="low",
+            ) as output:
+                for chunk in response.iter_bytes(chunk_size=4096):
+                    if chunk:
+                        _ = output.write(  # pyright: ignore[reportUnknownMemberType]
+                            chunk
+                        )
