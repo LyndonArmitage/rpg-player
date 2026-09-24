@@ -26,7 +26,6 @@ Below is a simple ASCIICast of the initial application:
 This project should run in Python versions >= 3.13.
 
 It has been built using [uv](https://docs.astral.sh/uv/).
-But it may work with other virtual environment tools.
 
 The repository uses a `src/` layout.
 
