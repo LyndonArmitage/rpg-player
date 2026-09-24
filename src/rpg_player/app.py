@@ -347,7 +347,12 @@ class Standby(Screen[None]):
         except Exception as e:
             log.exception("Agent response flow failed for %s", name)
             self._update_label(f"{name} failed to respond: {e}")
-            self.app.notify(f"{name} failed to respond", severity="error")
+            self.app.notify(
+                f"Speech failed for {name}: {e}",
+                title="Speech error",
+                severity="error",
+                timeout=15,
+            )
         finally:
             # This must also run when speech generation/playback raises.  The
             # old code only handled errors from the agent response, so a voice
