@@ -7,11 +7,26 @@ Project.
 
 ### Added
 
-- Add missing `pytest-cov` dev dependency
+- Added missing `pytest-cov` dev dependency
+- Added a fallback to the token counter code for `gpt-6` since it is not yet in
+  the open source library
+- Added extra logging around speech so you can more easily figure out issues
+- Added a timeout to response and speaking, this is a stop-gap measure to
+  prevent the UI from locking. Previously this meant you'd need to close and
+  reopen it
 
 ### Changed
 
+- Improved OpenAI voice actor class to speak faster and report errors nicely
+- Altered instances of OpenAI's `gpt-5.6` to `gpt-6` as it is currently the
+  better and cheaper model
+- Updated dependencies
+
 ### Removed
+
+- Removed Elevenlabs tag transformer. It's better to do this in the system
+  prompt of the agents.
+- Removed old `requirements.txt` file
 
 ## Version 0.2.0
 
