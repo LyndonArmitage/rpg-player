@@ -62,9 +62,8 @@ class OpenAIVoiceActor(VoiceActor, OutLoudVoiceActor):
             ) from err
 
         # Create an Async client using the OpenAI client
-        api_key = getattr(openai, "api_key", None)
-        base_url = getattr(openai, "base_url", None)
-        self.async_openai: AsyncOpenAI = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        self._api_key: str | None = getattr(openai, "api_key", None)
+        self._base_url: str | None = getattr(openai, "base_url", None)
 
     @property
     @override
@@ -123,11 +122,17 @@ class OpenAIVoiceActor(VoiceActor, OutLoudVoiceActor):
         kw["response_format"] = "pcm"
 
         async def _play_async():
-            async with self.async_openai.audio.speech.with_streaming_response.create(
-                **kw  # pyright: ignore[reportArgumentType]
-                # TODO: Fix above ignore
-            ) as resp:
-                await LocalAudioPlayer().play(resp)
+            async_openai: AsyncOpenAI = AsyncOpenAI(
+                api_key=self._api_key, base_url=self._base_url
+            )
+            try:
+                async with async_openai.audio.speech.with_streaming_response.create(
+                    **kw  # pyright: ignore[reportArgumentType]
+                    # TODO: Fix above ignore
+                ) as resp:
+                    await LocalAudioPlayer().play(resp)
+            finally:
+                await async_openai.close()
 
         try:
             _ = asyncio.get_running_loop()
@@ -142,5 +147,5 @@ class OpenAIVoiceActor(VoiceActor, OutLoudVoiceActor):
 
             threading.Thread(target=runner, daemon=True).start()
         except RuntimeError:
-            # Not running inn loop, so run it directly and block until done
+            # Not running in loop, so run it directly and block until done
             asyncio.run(_play_async())
